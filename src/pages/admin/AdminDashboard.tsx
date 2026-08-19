@@ -30,23 +30,25 @@ import {
 } from 'recharts';
 
 export const AdminDashboard: React.FC = () => {
-  const { games, books, agents, winnings } = useAdmin();
+  const { games, books, booksTotal, ticketsTotal, agents, winnings } = useAdmin();
   const navigate = useNavigate();
 
-  // Metrics calculations
-  const totalGames = 12; // Static from reference
-  const totalBooks = 1250; // Static from reference
-  const totalTickets = 125000; // Static from reference
-  const totalAgents = 156; // Static from reference
-  const totalSalesAmount = 1245500; // Static from reference
+  // Metrics are derived from the API-backed context collections.
+  const totalGames = games.length;
+  const totalBooks = booksTotal || books.length;
+  const totalTickets = ticketsTotal || books.reduce((t, b) => t + b.tickets.length, 0);
+  const totalAgents = agents.length;
+  const totalSalesAmount = books
+    .filter(book => book.status === 'Sold')
+    .reduce((total, book) => total + (book.bookValue || 0), 0);
 
-  const liveGamesCount = 2;
-  const upcomingGamesCount = 4;
-  const completedGamesCount = 6;
-  const soldBooksCount = 850;
-  const unsoldBooksCount = 150;
-  const unsoldByAdminCount = 80;
-  const availableBooksCount = 170;
+  const liveGamesCount = games.filter(game => game.status === 'Live').length;
+  const upcomingGamesCount = games.filter(game => game.status === 'Upcoming').length;
+  const completedGamesCount = games.filter(game => game.status === 'Completed').length;
+  const soldBooksCount = books.filter(book => book.status === 'Sold').length;
+  const unsoldBooksCount = books.filter(book => book.status === 'Unsold').length;
+  const unsoldByAdminCount = books.filter(book => book.status === 'Unsold by Admin').length;
+  const availableBooksCount = books.filter(book => book.status === 'Available').length;
 
   // Chart 1: Sales Overview Data (14 May 2025 - 14 June 2025)
   const salesData = [
@@ -191,7 +193,7 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* ROW 2: MINI METRICS CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
         {/* Live Games */}
         <div className="bg-[#EBF7EE] border border-[#D1F0D7] p-4 rounded-2xl flex flex-col justify-between min-h-[90px] shadow-sm relative overflow-hidden group">
           <div className="flex justify-between items-start">
@@ -275,6 +277,20 @@ export const AdminDashboard: React.FC = () => {
             View Details &gt;
           </Link>
         </div>
+
+        {/* Available Books */}
+        <div className="bg-[#EFF6FF] border border-[#DBEAFE] p-4 rounded-2xl flex flex-col justify-between min-h-[90px] shadow-sm relative overflow-hidden">
+          <div className="flex justify-between items-start">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Available Books</span>
+              <span className="text-xl font-extrabold text-blue-900 mt-1">{availableBooksCount}</span>
+            </div>
+            <BookOpen className="w-5 h-5 text-blue-500" />
+          </div>
+          <Link to="/admin/books?status=Available" className="text-[10px] font-semibold text-blue-700 flex items-center gap-1 hover:underline mt-2">
+            View Details &gt;
+          </Link>
+        </div>
       </div>
 
       {/* ROW 3: SALES OVERVIEW CHART & RECENT GAMES */}
@@ -349,11 +365,10 @@ export const AdminDashboard: React.FC = () => {
                     <td className="py-2.5 px-3 font-medium text-text-primary">{game.name}</td>
                     <td className="py-2.5 px-3 text-text-secondary font-medium">{game.drawDate}</td>
                     <td className="py-2.5 px-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        game.status === 'Live' ? 'bg-emerald-100 text-emerald-800' :
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${game.status === 'Live' ? 'bg-emerald-100 text-emerald-800' :
                         game.status === 'Upcoming' ? 'bg-sky-100 text-sky-800' :
-                        'bg-violet-100 text-violet-800'
-                      }`}>
+                          'bg-violet-100 text-violet-800'
+                        }`}>
                         {game.status}
                       </span>
                     </td>
@@ -393,9 +408,8 @@ export const AdminDashboard: React.FC = () => {
                   <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                     <td className="py-3 px-3 font-medium text-text-primary">{agent.name}</td>
                     <td className="py-3 px-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        agent.type === 'First Party' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                      }`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${agent.type === 'First Party' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}>
                         {agent.type}
                       </span>
                     </td>

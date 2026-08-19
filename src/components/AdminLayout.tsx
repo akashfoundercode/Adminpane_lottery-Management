@@ -6,15 +6,11 @@ import {
   LayoutDashboard,
   Dices,
   BookOpen,
-  FilePlus,
   UserPlus,
   History,
   Users,
   TrendingUp,
-  Trophy,
   FileText,
-  UploadCloud,
-  Award,
   BarChart2,
   PieChart,
   LineChart,
@@ -53,20 +49,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Games', path: '/admin/games', icon: Dices },
     { name: 'Books', path: '/admin/books', icon: BookOpen },
-    { name: 'Generate Books', path: '/admin/generate-books', icon: FilePlus },
     { name: 'Book Assignment', path: '/admin/book-assignment', icon: UserPlus },
     { name: 'Assignment History', path: '/admin/assignment-history', icon: History },
+    { name: 'Sold / Unsold Books', path: '/admin/sold-unsold', icon: History },
     { name: 'First Party Agents', path: '/admin/agents/first-party', icon: Users },
     { name: 'Third Party Agents', path: '/admin/agents/third-party', icon: Users },
     { name: 'Agent Performance', path: '/admin/agent-performance', icon: TrendingUp },
-    { name: 'Prize Management', path: '/admin/prizes', icon: Trophy },
     { name: 'Results', path: '/admin/results', icon: FileText },
-    { name: 'Upload Result', path: '/admin/results/upload', icon: UploadCloud },
-    { name: 'Winners', path: '/admin/winners', icon: Award },
     { name: 'Sales Reports', path: '/admin/reports/sales', icon: BarChart2 },
     { name: 'Book Reports', path: '/admin/reports/books', icon: PieChart },
     { name: 'Agent Reports', path: '/admin/reports/agents', icon: LineChart },
-    { name: 'Winning Reports', path: '/admin/reports/winning', icon: FileText },
     { name: 'Settings', path: '/admin/settings', icon: Settings }
   ];
 
@@ -120,13 +112,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#F7F9FC] flex font-sans">
       {/* DESKTOP SIDEBAR - width collapses smoothly from 260px to 70px */}
-      <aside className={`h-full hidden lg:flex flex-col bg-[#1e1b4b] text-slate-300 flex-shrink-0 border-r border-indigo-950 transition-all duration-300 ${
-        isSidebarCollapsed ? 'w-[75px]' : 'w-[260px]'
-      }`}>
-        {/* LOGO AREA */}
-        <div className={`flex items-center gap-3 px-5 py-5 border-b border-indigo-950/50 bg-[#151233] transition-all flex-shrink-0 ${
-          isSidebarCollapsed ? 'justify-center px-2' : ''
+      <aside className={`h-full hidden lg:flex flex-col bg-[#1e1b4b] text-slate-300 flex-shrink-0 border-r border-indigo-950 transition-all duration-300 ${isSidebarCollapsed ? 'w-[75px]' : 'w-[260px]'
         }`}>
+        {/* LOGO AREA */}
+        <div className={`flex items-center gap-3 px-5 py-5 border-b border-indigo-950/50 bg-[#151233] transition-all flex-shrink-0 ${isSidebarCollapsed ? 'justify-center px-2' : ''
+          }`}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-950/50 flex-shrink-0">
             <Sparkles className="w-5 h-5 text-indigo-100" />
           </div>
@@ -152,18 +142,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 key={idx}
                 to={item.path}
                 title={isSidebarCollapsed ? item.name : undefined}
-                className={`flex items-center rounded-lg text-[13px] font-medium transition-all duration-150 group ${
-                  isSidebarCollapsed ? 'justify-center p-2.5 mx-1.5' : 'gap-3 px-4 py-2.5'
-                } ${
-                  active
+                className={`flex items-center rounded-lg text-[13px] font-medium transition-all duration-150 group ${isSidebarCollapsed ? 'justify-center p-2.5 mx-1.5' : 'gap-3 px-4 py-2.5'
+                  } ${active
                     ? 'bg-[#6366f1] text-white font-semibold shadow-sm'
                     : 'hover:bg-indigo-900/30 hover:text-white text-slate-300'
-                }`}
+                  }`}
               >
                 <Icon
-                  className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${
-                    active ? 'text-white' : 'text-indigo-400 group-hover:text-white'
-                  }`}
+                  className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${active ? 'text-white' : 'text-indigo-400 group-hover:text-white'
+                    }`}
                 />
                 {!isSidebarCollapsed && <span className="truncate">{item.name}</span>}
               </Link>
@@ -175,9 +162,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className={`p-4 border-t border-indigo-950/40 bg-[#161338] ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
           <button
             onClick={handleLogout}
-            className={`flex items-center font-medium text-rose-400 hover:bg-rose-950/20 hover:text-rose-300 transition-colors rounded-lg ${
-              isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 w-full px-4 py-2.5 text-[13px]'
-            }`}
+            className={`flex items-center font-medium text-rose-400 hover:bg-rose-950/20 hover:text-rose-300 transition-colors rounded-lg ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 w-full px-4 py-2.5 text-[13px]'
+              }`}
             title="Log Out Admin"
           >
             <LogOut className="w-[18px] h-[18px]" />
@@ -237,11 +223,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                       key={idx}
                       to={item.path}
                       onClick={() => setIsMobileSidebarOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all group ${
-                        active
-                          ? 'bg-[#6366f1] text-white font-semibold'
-                          : 'hover:bg-indigo-900/40 hover:text-white text-slate-300'
-                      }`}
+                      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all group ${active
+                        ? 'bg-[#6366f1] text-white font-semibold'
+                        : 'hover:bg-indigo-900/40 hover:text-white text-slate-300'
+                        }`}
                     >
                       <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-indigo-400'}`} />
                       <span>{item.name}</span>

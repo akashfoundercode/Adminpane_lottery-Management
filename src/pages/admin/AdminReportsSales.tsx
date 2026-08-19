@@ -4,7 +4,13 @@ import { Download, Filter, IndianRupee, BookOpen, AlertCircle, FileText } from '
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts';
 
 export const AdminReportsSales: React.FC = () => {
-  const { books, games, agents } = useAdmin();
+  const { books, games, agents, fetchBooks, fetchGames, fetchAgents } = useAdmin();
+
+  React.useEffect(() => {
+    fetchBooks();
+    fetchGames();
+    fetchAgents();
+  }, []);
 
   // Filters
   const [selectedGameId, setSelectedGameId] = useState('All');
@@ -15,7 +21,9 @@ export const AdminReportsSales: React.FC = () => {
     return books.filter(b => {
       const isSold = b.status === 'Sold';
       const matchesGame = selectedGameId === 'All' || b.gameId === selectedGameId;
-      const matchesAgent = selectedAgentId === 'All' || b.agentId === selectedAgentId;
+      const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
+      const matchesAgent = selectedAgentId === 'All' || b.agentId === selectedAgentId ||
+        (selectedAgent?.apiId !== undefined && b.agentId === String(selectedAgent.apiId));
       return isSold && matchesGame && matchesAgent;
     });
   }, [books, selectedGameId, selectedAgentId]);

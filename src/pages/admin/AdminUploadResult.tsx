@@ -4,7 +4,11 @@ import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { ArrowLeft, Upload, FileText, Image as ImageIcon, Save, Check } from 'lucide-react';
 
-export const AdminUploadResult: React.FC = () => {
+interface AdminUploadResultProps {
+  onUploaded?: () => void | Promise<void>;
+}
+
+export const AdminUploadResult: React.FC<AdminUploadResultProps> = ({ onUploaded }) => {
   const { games, createResult, publishResult, results } = useAdmin();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -58,7 +62,7 @@ export const AdminUploadResult: React.FC = () => {
     try {
       setIsSaving(true);
       showToast('Uploading result sheet to server...', 'info');
-      
+
       // Call context to create result
       await createResult({
         gameId: selectedGameId,
@@ -69,7 +73,11 @@ export const AdminUploadResult: React.FC = () => {
       });
 
       showToast(publishImmediately ? 'Result uploaded and published immediately!' : 'Result saved as Draft.', 'success');
-      navigate('/admin/results');
+      if (onUploaded) {
+        await onUploaded();
+      } else {
+        navigate('/admin/results');
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to upload result.', 'error');
     } finally {

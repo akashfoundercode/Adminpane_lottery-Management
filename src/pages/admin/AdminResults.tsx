@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Plus, Eye, Trash2, Calendar, FileText, Globe, RefreshCw, AlertCircle } from 'lucide-react';
+import { Eye, Trash2, Calendar, FileText, Globe, RefreshCw, AlertCircle, UploadCloud, X } from 'lucide-react';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
+import AdminUploadResult from './AdminUploadResult';
 
 export const AdminResults: React.FC = () => {
-  const { results, deleteResult, publishResult, unpublishResult, fetchResults } = useAdmin();
+  const { results, resultsPagination, deleteResult, publishResult, unpublishResult, fetchResults } = useAdmin();
   const { showToast } = useToast();
 
   // Fetch results on component load
   React.useEffect(() => {
-    fetchResults();
+    fetchResults(10, 0, false);
   }, []);
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [deleteResultId, setDeleteResultId] = useState<string | null>(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   const handleDeleteClick = (id: string) => {
     setDeleteResultId(id);
@@ -47,14 +48,25 @@ export const AdminResults: React.FC = () => {
           <h2 className="text-[20px] font-bold text-text-primary font-display">Result Management</h2>
           <p className="text-xs text-text-secondary">View and publish winning numbers and board PDF/images</p>
         </div>
-        <Link
-          to="/admin/results/upload"
+        <button
+          onClick={() => setIsUploadOpen(true)}
           className="inline-flex items-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
         >
-          <Plus className="w-4 h-4" />
-          <span>Upload New Result</span>
-        </Link>
+          <UploadCloud className="w-4 h-4" />
+          Upload Result
+        </button>
       </div>
+
+      {resultsPagination.hasMore && (
+        <div className="flex justify-center border-t border-border-light pt-4">
+          <button
+            onClick={() => fetchResults(10, resultsPagination.currentPage * 10, true)}
+            className="px-4 py-2 border border-border-light bg-white rounded-lg text-xs font-semibold text-text-primary hover:bg-slate-50"
+          >
+            View More
+          </button>
+        </div>
+      )}
 
       {/* RESULTS GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -78,9 +90,8 @@ export const AdminResults: React.FC = () => {
                     (e.target as any).src = 'https://images.unsplash.com/photo-1518655061766-48f23af9304a?w=400';
                   }}
                 />
-                <span className={`absolute top-3 right-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
-                  result.status === 'Published' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
-                }`}>
+                <span className={`absolute top-3 right-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold ${result.status === 'Published' ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
+                  }`}>
                   {result.status}
                 </span>
               </div>
@@ -106,11 +117,10 @@ export const AdminResults: React.FC = () => {
                 <div className="flex justify-between items-center pt-3 border-t border-slate-100 mt-4">
                   <button
                     onClick={() => handlePublishToggle(result.id, result.status)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                      result.status === 'Published'
-                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    }`}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${result.status === 'Published'
+                      ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      }`}
                   >
                     <Globe className="w-3.5 h-3.5" />
                     <span>{result.status === 'Published' ? 'Unpublish' : 'Publish Result'}</span>
@@ -151,6 +161,32 @@ export const AdminResults: React.FC = () => {
         type="danger"
         confirmText="Delete Result"
       />
+
+      {isUploadOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 sm:p-8"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsUploadOpen(false);
+          }}
+        >
+          <div className="relative w-full max-w-5xl bg-[#F7F9FC] rounded-2xl shadow-2xl p-4 sm:p-6">
+            <button
+              type="button"
+              onClick={() => setIsUploadOpen(false)}
+              aria-label="Close upload result modal"
+              className="absolute right-5 top-5 z-10 p-2 rounded-lg bg-white border border-border-light text-text-secondary hover:text-text-primary hover:bg-slate-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <AdminUploadResult
+              onUploaded={async () => {
+                await fetchResults();
+                setIsUploadOpen(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

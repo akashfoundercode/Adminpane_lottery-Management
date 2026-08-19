@@ -1,15 +1,34 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
-import { ArrowLeft, BookOpen, User, Calendar, Tag, ShieldCheck, HelpCircle } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
+import { ArrowLeft, BookOpen, User, Calendar, Tag, ShieldCheck, HelpCircle, CheckCircle2, XCircle } from 'lucide-react';
 
 export const AdminBookDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { books, games, agents } = useAdmin();
+  const { books, games, agents, updateBookStatus } = useAdmin();
+  const { showToast } = useToast();
+  const [statusToUpdate, setStatusToUpdate] = React.useState<'Sold' | 'Unsold' | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
 
   const book = books.find(b => b.id === id);
   const game = book ? games.find(g => g.id === book.gameId) : null;
   const agent = book ? agents.find(a => a.id === book.agentId) : null;
+
+  const handleStatusUpdate = async () => {
+    if (!book || !statusToUpdate) return;
+    setIsUpdatingStatus(true);
+    try {
+      await updateBookStatus(book.id, statusToUpdate);
+      showToast(`Book ${book.id} marked as ${statusToUpdate}.`, 'success');
+      setStatusToUpdate(null);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to update book status.', 'error');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   if (!book) {
     return (
@@ -70,13 +89,12 @@ export const AdminBookDetails: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-text-secondary">Current Status</span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                  book.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                  book.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                  book.status === 'Assigned' || book.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
-                  book.status === 'Unsold' ? 'bg-amber-100 text-amber-800' :
-                  'bg-rose-100 text-rose-800'
-                }`}>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${book.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
+                    book.status === 'Available' ? 'bg-blue-100 text-blue-800' :
+                      book.status === 'Assigned' || book.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
+                        book.status === 'Unsold' ? 'bg-amber-100 text-amber-800' :
+                          'bg-rose-100 text-rose-800'
+                  }`}>
                   {book.status}
                 </span>
               </div>
@@ -131,12 +149,11 @@ export const AdminBookDetails: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-text-primary">{ticketNo}</span>
                   </div>
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                    tStatus === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                    tStatus === 'Assigned' ? 'bg-purple-100 text-purple-800' :
-                    tStatus === 'Unsold' ? 'bg-amber-100 text-amber-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${tStatus === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
+                      tStatus === 'Assigned' ? 'bg-purple-100 text-purple-800' :
+                        tStatus === 'Unsold' ? 'bg-amber-100 text-amber-800' :
+                          'bg-blue-100 text-blue-800'
+                    }`}>
                     {tStatus}
                   </span>
                 </div>
@@ -155,7 +172,7 @@ export const AdminBookDetails: React.FC = () => {
             <div className="space-y-4 text-xs">
               <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#6366f1] flex items-center justify-center flex-shrink-0 font-bold border border-indigo-100">
-                  {book.agentName ? book.agentName.slice(0,2).toUpperCase() : 'AG'}
+                  {book.agentName ? book.agentName.slice(0, 2).toUpperCase() : 'AG'}
                 </div>
                 <div className="flex flex-col">
                   <span className="font-bold text-text-primary">{book.agentName}</span>
@@ -195,8 +212,36 @@ export const AdminBookDetails: React.FC = () => {
               </Link>
             </div>
           )}
+
+          <div className="border-t border-border-light pt-4 space-y-2">
+            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">Change Status</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStatusToUpdate('Sold')}
+                disabled={book.status === 'Sold' || isUpdatingStatus}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-[10px] font-bold hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" /> Sold
+              </button>
+              <button
+                onClick={() => setStatusToUpdate('Unsold')}
+                disabled={book.status === 'Unsold' || isUpdatingStatus}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 text-amber-700 text-[10px] font-bold hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <XCircle className="w-3.5 h-3.5" /> Unsold
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={statusToUpdate !== null}
+        onClose={() => !isUpdatingStatus && setStatusToUpdate(null)}
+        onConfirm={handleStatusUpdate}
+        title={`Mark this book as ${statusToUpdate || 'updated'}?`}
+        description={`This will change the book status to ${statusToUpdate || 'the selected status'} using the admin API.`}
+      />
     </div>
   );
 };

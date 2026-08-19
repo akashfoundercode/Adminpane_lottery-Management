@@ -6,13 +6,13 @@ import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { useToast } from '../../context/ToastContext';
 
 export const AdminGames: React.FC = () => {
-  const { games, deleteGame, toggleGameStatus, fetchGames } = useAdmin();
+  const { games, gamesPagination, deleteGame, toggleGameStatus, fetchGames } = useAdmin();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
   // Fetch games on mount
   React.useEffect(() => {
-    fetchGames();
+    fetchGames(10, 0, false);
   }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,18 +28,14 @@ export const AdminGames: React.FC = () => {
   const filteredGames = useMemo(() => {
     return games.filter(game => {
       const matchesSearch = game.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            game.gameCode.toLowerCase().includes(searchTerm.toLowerCase());
+        game.gameCode.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'All' || game.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [games, searchTerm, statusFilter]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredGames.length / itemsPerPage);
-  const paginatedGames = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredGames.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredGames, currentPage]);
+  const paginatedGames = filteredGames;
 
   const handleDeleteClick = (id: string) => {
     setSelectedGameId(id);
@@ -142,12 +138,11 @@ export const AdminGames: React.FC = () => {
                       <span>{game.drawDate}</span>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold ${
-                        game.status === 'Live' ? 'bg-emerald-100 text-emerald-800' :
-                        game.status === 'Upcoming' ? 'bg-sky-100 text-sky-800' :
-                        game.status === 'Completed' ? 'bg-violet-100 text-violet-800' :
-                        'bg-rose-100 text-rose-800'
-                      }`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-bold ${game.status === 'Live' ? 'bg-emerald-100 text-emerald-800' :
+                          game.status === 'Upcoming' ? 'bg-sky-100 text-sky-800' :
+                            game.status === 'Completed' ? 'bg-violet-100 text-violet-800' :
+                              'bg-rose-100 text-rose-800'
+                        }`}>
                         {game.status}
                       </span>
                     </td>
@@ -188,40 +183,10 @@ export const AdminGames: React.FC = () => {
         )}
 
         {/* PAGINATION */}
-        {totalPages > 1 && (
+        {gamesPagination.hasMore && (
           <div className="px-4 py-3 border-t border-border-light bg-slate-50/50 flex items-center justify-between">
-            <span className="text-[11px] text-text-secondary">
-              Showing <strong className="font-semibold text-text-primary">{((currentPage - 1) * itemsPerPage) + 1}</strong> to <strong className="font-semibold text-text-primary">{Math.min(currentPage * itemsPerPage, filteredGames.length)}</strong> of <strong className="font-semibold text-text-primary">{filteredGames.length}</strong> games
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-2.5 py-1 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`w-7 h-7 rounded-lg text-[10px] font-bold transition-all ${
-                    currentPage === i + 1
-                      ? 'bg-[#6366f1] text-white shadow-sm'
-                      : 'border border-border-light bg-white text-text-primary hover:bg-slate-50'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-2.5 py-1 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
+            <span className="text-[11px] text-text-secondary">Showing {games.length} of {gamesPagination.total || games.length} games</span>
+            <button onClick={() => fetchGames(itemsPerPage, gamesPagination.currentPage * itemsPerPage, true)} className="px-4 py-2 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50">View More</button>
           </div>
         )}
       </div>

@@ -58,7 +58,7 @@ export const BookDetails: React.FC = () => {
   const getTicketStatus = (ticketNum: string) => {
     const isWin = winnings.some(w => w.bookId === book.id && w.ticketNumber === ticketNum);
     if (isWin) return 'Winning';
-    
+
     if (book.status === 'Sold') return 'Sold';
     if (book.status === 'Unsold') return 'Unsold';
     if (book.status === 'Unsold by Admin') return 'Expired';
@@ -81,14 +81,24 @@ export const BookDetails: React.FC = () => {
   };
 
   // Perform Book Updates
-  const handleConfirmSold = () => {
-    markBookAsSold(book.id);
-    showToast(`Book ${book.id} marked as Sold.`, 'success');
+  const handleConfirmSold = async () => {
+    try {
+      await markBookAsSold(book.id);
+      setIsSoldModalOpen(false);
+      showToast(`Book ${book.id} marked as Sold.`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to mark book as Sold.', 'error');
+    }
   };
 
-  const handleConfirmUnsold = () => {
-    markBookAsUnsold(book.id);
-    showToast(`Book ${book.id} marked as Unsold.`, 'success');
+  const handleConfirmUnsold = async () => {
+    try {
+      await markBookAsUnsold(book.id);
+      setIsUnsoldModalOpen(false);
+      showToast(`Book ${book.id} marked as Unsold.`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to mark book as Unsold.', 'error');
+    }
   };
 
   const isActionsAllowed = book.status === 'Assigned' || book.status === 'In Progress';
@@ -121,13 +131,13 @@ export const BookDetails: React.FC = () => {
         {/* Specs Table */}
         <div className="lg:col-span-2 premium-card p-5 bg-white border border-border-light shadow-sm space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-text-primary">Book Specifications</h3>
-          
+
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="p-3 bg-bg-app rounded-xl border border-border-light">
               <span className="text-[10px] text-text-secondary font-bold uppercase tracking-wider block">Game Title</span>
               <span className="text-sm font-bold text-text-primary block mt-1">{game.name}</span>
             </div>
-            
+
             <div className="p-3 bg-bg-app rounded-xl border border-border-light">
               <span className="text-[10px] text-text-secondary font-bold uppercase tracking-wider block">Ticket Price</span>
               <span className="text-sm font-bold text-text-primary block mt-1">₹{game.ticketPrice}</span>
@@ -224,7 +234,7 @@ export const BookDetails: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-3">
           {book.tickets.map((ticket) => {
             const status = getTicketStatus(ticket);
-            
+
             let statusStyle = 'border-gray-200 bg-white text-text-primary';
             if (status === 'Sold') {
               statusStyle = 'border-green-200 bg-green-50/50 text-success-main';
@@ -243,7 +253,7 @@ export const BookDetails: React.FC = () => {
               >
                 <span className="font-mono text-sm tracking-wider font-semibold block">{ticket}</span>
                 <span className="text-[9px] uppercase tracking-wider mt-1 block opacity-80">{status}</span>
-                
+
                 {status === 'Winning' && (
                   <div className="flex justify-center mt-1 text-info-main">
                     <Trophy className="w-3.5 h-3.5" />

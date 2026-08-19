@@ -5,11 +5,11 @@ import { useToast } from '../../context/ToastContext';
 import { Search, Plus, Edit, UserCheck, UserX, Eye, AlertCircle, Mail, Phone, MapPin } from 'lucide-react';
 
 export const AdminAgentsFirstParty: React.FC = () => {
-  const { agents, createAgent, updateAgent, toggleAgentStatus, fetchAgents } = useAdmin();
+  const { agents, agentsPagination, createAgent, updateAgent, toggleAgentStatus, fetchAgents } = useAdmin();
   const { showToast } = useToast();
 
   React.useEffect(() => {
-    fetchAgents();
+    fetchAgents(10, 0, false);
   }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,29 +25,28 @@ export const AdminAgentsFirstParty: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [address, setAddress] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
 
   // Filter First Party Agents
   const filteredAgents = useMemo(() => {
     return agents.filter(a => {
       const isFirstParty = a.agentType === 'First Party';
       const matchesSearch = a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            a.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            a.id.toLowerCase().includes(searchTerm.toLowerCase());
+        a.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.id.toLowerCase().includes(searchTerm.toLowerCase());
       return isFirstParty && matchesSearch;
     });
   }, [agents, searchTerm]);
 
   // Pagination
-  const totalPages = Math.ceil(filteredAgents.length / itemsPerPage);
-  const paginatedAgents = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAgents.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAgents, currentPage]);
+  const paginatedAgents = filteredAgents;
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email || !mobile) {
+    if (!name || !email || !mobile || !whatsapp || !address || !password) {
       showToast('Please fill in required fields.', 'error');
       return;
     }
@@ -56,8 +55,11 @@ export const AdminAgentsFirstParty: React.FC = () => {
         name,
         email,
         mobile,
+        whatsapp,
         address,
-        agentType: 'First Party'
+        agentType: 'First Party',
+        password,
+        status
       });
       showToast('Agent added successfully.', 'success');
       setIsAddOpen(false);
@@ -65,7 +67,10 @@ export const AdminAgentsFirstParty: React.FC = () => {
       setName('');
       setEmail('');
       setMobile('');
+      setWhatsapp('');
       setAddress('');
+      setPassword('');
+      setStatus('Active');
     } catch (err: any) {
       showToast(err.message || 'Failed to create agent.', 'error');
     }
@@ -164,9 +169,8 @@ export const AdminAgentsFirstParty: React.FC = () => {
                     <td className="py-3 px-4 text-text-secondary font-medium">{agent.mobile}</td>
                     <td className="py-3 px-4 text-text-secondary max-w-[180px] truncate">{agent.address}</td>
                     <td className="py-3 px-4">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        agent.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                      }`}>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${agent.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
                         {agent.status}
                       </span>
                     </td>
@@ -174,9 +178,8 @@ export const AdminAgentsFirstParty: React.FC = () => {
                       <div className="flex items-center justify-center gap-3">
                         <button
                           onClick={() => handleToggleStatus(agent.id, agent.status)}
-                          className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${
-                            agent.status === 'Active' ? 'text-rose-600 bg-rose-50 hover:bg-rose-100' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
-                          }`}
+                          className={`text-[10px] font-bold px-2 py-1 rounded transition-colors ${agent.status === 'Active' ? 'text-rose-600 bg-rose-50 hover:bg-rose-100' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                            }`}
                         >
                           {agent.status === 'Active' ? 'Deactivate' : 'Activate'}
                         </button>
@@ -202,40 +205,10 @@ export const AdminAgentsFirstParty: React.FC = () => {
         )}
 
         {/* PAGINATION */}
-        {totalPages > 1 && (
+        {agentsPagination.hasMore && (
           <div className="px-4 py-3 border-t border-border-light bg-slate-50/50 flex items-center justify-between">
-            <span className="text-[11px] text-text-secondary">
-              Showing <strong className="font-semibold text-text-primary">{((currentPage - 1) * itemsPerPage) + 1}</strong> to <strong className="font-semibold text-text-primary">{Math.min(currentPage * itemsPerPage, filteredAgents.length)}</strong> of <strong className="font-semibold text-text-primary">{filteredAgents.length}</strong> agents
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-2.5 py-1 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`w-7 h-7 rounded-lg text-[10px] font-bold transition-all ${
-                    currentPage === i + 1
-                      ? 'bg-[#6366f1] text-white shadow-sm'
-                      : 'border border-border-light bg-white text-text-primary hover:bg-slate-50'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-2.5 py-1 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
+            <span className="text-[11px] text-text-secondary">Showing {agents.length} of {agentsPagination.total || agents.length} agents</span>
+            <button onClick={() => fetchAgents(10, agentsPagination.currentPage * 10, true)} className="px-4 py-2 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50">View More</button>
           </div>
         )}
       </div>
@@ -269,7 +242,7 @@ export const AdminAgentsFirstParty: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Mobile *</label>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Mobile Number *</label>
                 <input
                   type="text"
                   required
@@ -279,13 +252,45 @@ export const AdminAgentsFirstParty: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Address</label>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">WhatsApp Number *</label>
                 <input
                   type="text"
+                  required
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Address *</label>
+                <input
+                  type="text"
+                  required
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
                 />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Password *</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Status *</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as 'Active' | 'Inactive')}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
               </div>
               <div className="flex justify-end gap-2 pt-2 border-t mt-4">
                 <button

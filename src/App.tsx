@@ -33,6 +33,7 @@ import AdminBookDetails from './pages/admin/AdminBookDetails';
 import AdminGenerateBooks from './pages/admin/AdminGenerateBooks';
 import AdminBookAssignment from './pages/admin/AdminBookAssignment';
 import AdminAssignmentHistory from './pages/admin/AdminAssignmentHistory';
+import AdminSoldUnsold from './pages/admin/AdminSoldUnsold';
 import AdminAgentsFirstParty from './pages/admin/AdminAgentsFirstParty';
 import AdminAgentsThirdParty from './pages/admin/AdminAgentsThirdParty';
 import AdminAgentDetails from './pages/admin/AdminAgentDetails';
@@ -56,10 +57,10 @@ function App() {
             <Routes>
               {/* Redirect root to admin dashboard */}
               <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-              
+
               {/* Agent Login Route */}
               <Route path="/agent/login" element={<Login />} />
-              
+
               {/* Protected Agent Routes */}
               <Route
                 path="/agent/*"
@@ -101,6 +102,7 @@ function App() {
                         <Route path="generate-books" element={<AdminGenerateBooks />} />
                         <Route path="book-assignment" element={<AdminBookAssignment />} />
                         <Route path="assignment-history" element={<AdminAssignmentHistory />} />
+                        <Route path="sold-unsold" element={<AdminSoldUnsold />} />
                         <Route path="agents/first-party" element={<AdminAgentsFirstParty />} />
                         <Route path="agents/third-party" element={<AdminAgentsThirdParty />} />
                         <Route path="agents/:id" element={<AdminAgentDetails />} />
@@ -120,7 +122,7 @@ function App() {
                   </AdminProtectedRoute>
                 }
               />
-              
+
               {/* Redirect all other unmatched routes to login */}
               <Route path="*" element={<Navigate to="/admin/login" replace />} />
             </Routes>

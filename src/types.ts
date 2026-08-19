@@ -19,6 +19,7 @@ export interface Game {
 
 export interface Agent {
   id: string; // Same as agentId
+  apiId?: number;
   name: string;
   agentId: string;
   email: string;
@@ -31,8 +32,10 @@ export interface Agent {
 
 export interface Book {
   id: string; // Book ID, e.g. BK1001
+  apiId?: number;
   gameId: string;
   gameName?: string;
+  bookName?: string;
   agentId: string;
   agentName?: string;
   tickets: string[]; // List of ticket numbers in this book
@@ -45,6 +48,9 @@ export interface Book {
   assignedDate: string;
   expiryDate: string;
   createdDate?: string;
+  soldDate?: string;
+  unsoldDate?: string;
+  expiredDate?: string;
   status: 'Available' | 'Assigned' | 'In Progress' | 'Sold' | 'Unsold' | 'Unsold by Admin';
 }
 
@@ -92,10 +98,22 @@ export interface Result {
 export interface AssignmentHistory {
   id: string;
   bookId: string;
+  bookName?: string;
   gameName: string;
   agentName: string;
+  agentId?: string;
   agentType: 'First Party' | 'Third Party';
   assignedDate: string;
   expiryDate: string;
   status: string;
+}
+
+export interface ListPagination {
+  total: number;
+  perPage: number;
+  currentPage: number;
+  lastPage: number;
+  nextPageUrl: string | null;
+  prevPageUrl: string | null;
+  hasMore: boolean;
 }

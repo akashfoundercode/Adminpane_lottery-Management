@@ -3,7 +3,12 @@ import { useAdmin } from '../../context/AdminContext';
 import { Download, Filter, Search, Award } from 'lucide-react';
 
 export const AdminReportsAgents: React.FC = () => {
-  const { agents, books, winnings } = useAdmin();
+  const { agents, books, winnings, fetchAgents, fetchBooks } = useAdmin();
+
+  React.useEffect(() => {
+    fetchAgents();
+    fetchBooks();
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -11,7 +16,8 @@ export const AdminReportsAgents: React.FC = () => {
   // Compute standings
   const agentReportData = useMemo(() => {
     return agents.map(agent => {
-      const agentBooks = books.filter(b => b.agentId === agent.id);
+      const agentBooks = books.filter(b => b.agentId === agent.id ||
+        (agent.apiId !== undefined && b.agentId === String(agent.apiId)));
       const totalAssigned = agentBooks.length;
       const soldBooks = agentBooks.filter(b => b.status === 'Sold').length;
       const unsoldBooks = agentBooks.filter(b => b.status === 'Unsold').length;
@@ -43,7 +49,7 @@ export const AdminReportsAgents: React.FC = () => {
   const filteredReports = useMemo(() => {
     return agentReportData.filter(r => {
       const matchesSearch = r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            r.id.toLowerCase().includes(searchTerm.toLowerCase());
+        r.id.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = typeFilter === 'All' || r.type === typeFilter;
       return matchesSearch && matchesType;
     });
@@ -118,9 +124,8 @@ export const AdminReportsAgents: React.FC = () => {
                 <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
                   <td className="py-3 px-4 font-semibold text-text-primary">{report.name}</td>
                   <td className="py-3 px-4">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      report.type === 'Third Party' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
-                    }`}>
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${report.type === 'Third Party' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                      }`}>
                       {report.type}
                     </span>
                   </td>
@@ -133,11 +138,10 @@ export const AdminReportsAgents: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${
-                            report.perf >= 80 ? 'bg-emerald-500' :
-                            report.perf >= 50 ? 'bg-indigo-500' :
-                            'bg-amber-500'
-                          }`}
+                          className={`h-full rounded-full ${report.perf >= 80 ? 'bg-emerald-500' :
+                              report.perf >= 50 ? 'bg-indigo-500' :
+                                'bg-amber-500'
+                            }`}
                           style={{ width: `${report.perf}%` }}
                         />
                       </div>

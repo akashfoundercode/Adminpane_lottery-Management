@@ -5,7 +5,7 @@ import { Book } from '../types';
 import { Search, Filter, ArrowUpDown, Eye, BookOpen, AlertTriangle } from 'lucide-react';
 
 export const Books: React.FC = () => {
-  const { books, games } = useAgent();
+  const { books, games, booksPagination, fetchAgentBooks } = useAgent();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -15,13 +15,12 @@ export const Books: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortField, setSortField] = useState<'expiryDate' | 'bookValue' | 'assignedDate'>('expiryDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  
+
   // Expiry window filter
   const [expiryFilter, setExpiryFilter] = useState<'all' | 'soon' | 'past'>('all');
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 50;
+  const [offset, setOffset] = useState(0);
 
   // Sync with topbar quick search parameter
   useEffect(() => {
@@ -32,10 +31,10 @@ export const Books: React.FC = () => {
     }
   }, [location.search]);
 
-  // Reset pagination on filter change
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, gameFilter, statusFilter, sortField, sortOrder, expiryFilter]);
+    setOffset(0);
+    fetchAgentBooks(itemsPerPage, 0, false);
+  }, [searchTerm, gameFilter, statusFilter, expiryFilter, sortField, sortOrder]);
 
   const getGameName = (gameId: string) => {
     return games.find(g => g.id === gameId)?.name || 'Unknown Game';
@@ -111,13 +110,7 @@ export const Books: React.FC = () => {
     return result;
   }, [books, searchTerm, gameFilter, statusFilter, sortField, sortOrder, expiryFilter]);
 
-  // Paginated books
-  const paginatedBooks = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredBooks.slice(start, start + itemsPerPage);
-  }, [filteredBooks, currentPage]);
-
-  const totalPages = Math.ceil(filteredBooks.length / itemsPerPage) || 1;
+  const paginatedBooks = filteredBooks;
 
   const toggleSort = (field: 'expiryDate' | 'bookValue' | 'assignedDate') => {
     if (sortField === field) {
@@ -203,27 +196,24 @@ export const Books: React.FC = () => {
             <span>Sort by:</span>
             <button
               onClick={() => toggleSort('expiryDate')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                sortField === 'expiryDate' ? 'border-brand-emerald bg-emerald-50 text-brand-emerald' : 'border-border-light bg-white hover:bg-gray-50'
-              }`}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${sortField === 'expiryDate' ? 'border-brand-emerald bg-emerald-50 text-brand-emerald' : 'border-border-light bg-white hover:bg-gray-50'
+                }`}
             >
               <span>Expiry Date</span>
               <ArrowUpDown className="w-3 h-3" />
             </button>
             <button
               onClick={() => toggleSort('bookValue')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                sortField === 'bookValue' ? 'border-brand-emerald bg-emerald-50 text-brand-emerald' : 'border-border-light bg-white hover:bg-gray-50'
-              }`}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${sortField === 'bookValue' ? 'border-brand-emerald bg-emerald-50 text-brand-emerald' : 'border-border-light bg-white hover:bg-gray-50'
+                }`}
             >
               <span>Book Value</span>
               <ArrowUpDown className="w-3 h-3" />
             </button>
             <button
               onClick={() => toggleSort('assignedDate')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${
-                sortField === 'assignedDate' ? 'border-brand-emerald bg-emerald-50 text-brand-emerald' : 'border-border-light bg-white hover:bg-gray-50'
-              }`}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors cursor-pointer ${sortField === 'assignedDate' ? 'border-brand-emerald bg-emerald-50 text-brand-emerald' : 'border-border-light bg-white hover:bg-gray-50'
+                }`}
             >
               <span>Assigned Date</span>
               <ArrowUpDown className="w-3 h-3" />
@@ -314,7 +304,7 @@ export const Books: React.FC = () => {
                   {book.status}
                 </span>
               </div>
-              
+
               <div className="space-y-1">
                 <p className="text-xs text-text-secondary font-medium">Game Name</p>
                 <p className="text-sm font-semibold text-text-primary">{getGameName(book.gameId)}</p>
@@ -349,21 +339,29 @@ export const Books: React.FC = () => {
       </div>
 
       {/* PAGINATION TOOLBAR */}
-      {totalPages > 1 && (
+      {(offset > 0 || booksPagination.hasMore) && (
         <div className="flex items-center justify-between border-t border-border-light pt-4 text-xs font-medium">
           <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
+            onClick={() => {
+              const previousOffset = Math.max(offset - itemsPerPage, 0);
+              setOffset(previousOffset);
+              fetchAgentBooks(itemsPerPage, previousOffset, false);
+            }}
+            disabled={offset === 0}
             className="px-3 py-1.5 border border-border-light rounded-lg bg-white text-text-secondary hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             Previous
           </button>
           <span className="text-text-secondary">
-            Page <strong className="text-text-primary">{currentPage}</strong> of <strong className="text-text-primary">{totalPages}</strong>
+            Showing <strong className="text-text-primary">{Math.min(offset + itemsPerPage, booksPagination.total || offset + paginatedBooks.length)}</strong> of <strong className="text-text-primary">{booksPagination.total || paginatedBooks.length}</strong>
           </span>
           <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
+            onClick={() => {
+              const nextOffset = offset + itemsPerPage;
+              setOffset(nextOffset);
+              fetchAgentBooks(itemsPerPage, nextOffset, false);
+            }}
+            disabled={!booksPagination.hasMore}
             className="px-3 py-1.5 border border-border-light rounded-lg bg-white text-text-secondary hover:text-text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             Next

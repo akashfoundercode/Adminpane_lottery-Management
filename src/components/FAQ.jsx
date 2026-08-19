@@ -1,4 +1,4 @@
-import React from 'react';
+  import React from 'react';
 import { Accordion } from './ui/Accordion';
 import GlassCard from './ui/GlassCard';
 

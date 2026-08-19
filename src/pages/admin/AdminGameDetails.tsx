@@ -137,7 +137,7 @@ export const AdminGameDetails: React.FC = () => {
               to={`/admin/generate-books?gameId=${game.id}`}
               className="flex-1 text-center bg-[#6366f1] hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition-colors text-xs"
             >
-              Generate Books
+              Upload Books
             </Link>
             <button
               onClick={handleDelete}
@@ -156,7 +156,7 @@ export const AdminGameDetails: React.FC = () => {
           <div className="flex-1 overflow-y-auto max-h-[400px]">
             {gameBooks.length === 0 ? (
               <div className="p-8 text-center text-text-secondary text-xs">
-                No books generated for this game yet. Generate books using the button on the left.
+                No books uploaded for this game yet. Upload books using the button on the left.
               </div>
             ) : (
               <table className="w-full text-left border-collapse text-xs">
@@ -178,12 +178,11 @@ export const AdminGameDetails: React.FC = () => {
                       </td>
                       <td className="py-2 px-3 font-mono font-medium text-text-secondary">{b.serialNumber}</td>
                       <td className="py-2 px-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                          b.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                          b.status === 'Assigned' ? 'bg-purple-100 text-purple-800' :
-                          b.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${b.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
+                            b.status === 'Assigned' ? 'bg-purple-100 text-purple-800' :
+                              b.status === 'Available' ? 'bg-blue-100 text-blue-800' :
+                                'bg-amber-100 text-amber-800'
+                          }`}>
                           {b.status}
                         </span>
                       </td>

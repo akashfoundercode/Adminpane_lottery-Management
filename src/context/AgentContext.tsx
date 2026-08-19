@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Agent, Book, Game, Winning, Ticket } from '../types';
+import { Agent, Book, Game, Winning, Ticket, ListPagination } from '../types';
 
 interface AgentContextType {
   isAuthenticated: boolean;
@@ -7,17 +7,30 @@ interface AgentContextType {
   books: Book[];
   games: Game[];
   winnings: Winning[];
+  booksPagination: ListPagination;
+  fetchAgentBooks: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
   login: (agentId: string, password: string) => Promise<boolean>;
   logout: () => void;
-  markBookAsSold: (bookId: string) => void;
-  markBookAsUnsold: (bookId: string) => void;
+  markBookAsSold: (bookId: string) => Promise<boolean>;
+  markBookAsUnsold: (bookId: string) => Promise<boolean>;
   updateProfile: (profileData: Partial<Agent>) => void;
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
 
+const EMPTY_BOOKS_PAGINATION: ListPagination = {
+  total: 0,
+  perPage: 10,
+  currentPage: 1,
+  lastPage: 1,
+  nextPageUrl: null,
+  prevPageUrl: null,
+  hasMore: false
+};
+
 const DUMMY_AGENT: Agent = {
   id: 'AG1001',
+  apiId: 4,
   name: 'Rajesh Kumar',
   agentId: 'AG1001',
   email: 'rajesh@gmail.com',
@@ -94,12 +107,10 @@ const generateMockBooks = (): Book[] => {
     tickets: Array.from({ length: 10 }, () => String(ticketCounter++).padStart(5, '0')),
     bookValue: 1000,
     assignedDate: '2026-08-10T10:00:00+05:30',
-    expiryDate: '2026-08-20T18:00:00+05:30', // In the future
+    expiryDate: '2026-08-20T18:00:00+05:30',
     status: 'Assigned'
   });
 
-  // 2. BK1040 - Active Assigned, Mega Lucky Draw, Expires in ~2.5 hours from local time Aug 15 13:02
-  // Let's set it to expire at August 15, 2026 15:36:00
   books.push({
     id: 'BK1040',
     gameId: 'GM101',
@@ -107,11 +118,10 @@ const generateMockBooks = (): Book[] => {
     tickets: Array.from({ length: 10 }, () => String(ticketCounter++).padStart(5, '0')),
     bookValue: 1000,
     assignedDate: '2026-08-11T12:00:00+05:30',
-    expiryDate: '2026-08-15T15:36:00+05:30', // Expiry soon
+    expiryDate: '2026-08-15T15:36:00+05:30',
     status: 'Assigned'
   });
 
-  // 3. BK1006 - Active Assigned, Emerald Raffle
   books.push({
     id: 'BK1006',
     gameId: 'GM103',
@@ -123,7 +133,6 @@ const generateMockBooks = (): Book[] => {
     status: 'Assigned'
   });
 
-  // 4. Two more active books to make it 5 active books
   books.push({
     id: 'BK1041',
     gameId: 'GM102',
@@ -146,17 +155,12 @@ const generateMockBooks = (): Book[] => {
     status: 'Assigned'
   });
 
-  // 5. 82 Sold Books (all values ₹1,000 to total exactly ₹82,000 sales)
-  // Let's scatter their sold dates over the last 15 days
   for (let i = 1; i <= 82; i++) {
     const bookId = `BK${String(1100 + i)}`;
     const isGM101 = i % 2 === 0;
     const gameId = isGM101 ? 'GM101' : 'GM102';
-    
-    // Spread sold date between Aug 1 and Aug 15
     const soldDay = (i % 14) + 1;
     const soldDate = `2026-08-${String(soldDay).padStart(2, '0')}T17:30:00+05:30`;
-
     books.push({
       id: bookId,
       gameId,
@@ -166,17 +170,14 @@ const generateMockBooks = (): Book[] => {
       assignedDate: `2026-08-01T09:00:00+05:30`,
       expiryDate: `2026-08-15T18:00:00+05:30`,
       status: 'Sold',
-      // Store custom attribute for history & sales aggregation
       ...({ soldDate } as any)
     });
   }
 
-  // 6. 10 Unsold Books (marked by Agent)
   for (let i = 1; i <= 10; i++) {
     const bookId = `BK${String(1200 + i)}`;
-    const unsoldDay = (i % 5) + 8; // Aug 8 to Aug 12
+    const unsoldDay = (i % 5) + 8;
     const unsoldDate = `2026-08-${String(unsoldDay).padStart(2, '0')}T18:30:00+05:30`;
-
     books.push({
       id: bookId,
       gameId: 'GM101',
@@ -190,12 +191,9 @@ const generateMockBooks = (): Book[] => {
     });
   }
 
-  // 7. 8 Unsold by Admin Books (Expired automatically)
-  // Expiry date must be clearly in the past
   for (let i = 1; i <= 8; i++) {
     const bookId = `BK${String(1300 + i)}`;
     const expiredDate = `2026-08-12T12:00:00+05:30`;
-
     books.push({
       id: bookId,
       gameId: 'GM101',
@@ -203,7 +201,7 @@ const generateMockBooks = (): Book[] => {
       tickets: Array.from({ length: 10 }, () => String(ticketCounter++).padStart(5, '0')),
       bookValue: 1000,
       assignedDate: `2026-08-05T09:00:00+05:30`,
-      expiryDate: `2026-08-12T12:00:00+05:30`, // Past
+      expiryDate: `2026-08-12T12:00:00+05:30`,
       status: 'Unsold by Admin',
       ...({ expiredDate } as any)
     });
@@ -229,11 +227,18 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return generateMockBooks();
   });
+  const [booksPagination, setBooksPagination] = useState<ListPagination>(EMPTY_BOOKS_PAGINATION);
 
   // Save books to local storage whenever they change
   useEffect(() => {
     localStorage.setItem('lucky_draw_books', JSON.stringify(books));
   }, [books]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchAgentBooks(10, 0, false);
+    }
+  }, [isAuthenticated]);
 
   // Expiry Checker: checks and transitions expired books to 'Unsold by Admin'
   useEffect(() => {
@@ -242,7 +247,6 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let updated = false;
 
       const newBooks = books.map(book => {
-        // Only transition Assigned or In Progress books
         if ((book.status === 'Assigned' || book.status === 'In Progress')) {
           const expiryTime = new Date(book.expiryDate);
           if (expiryTime < now) {
@@ -262,16 +266,12 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
-    // Run once on load
     checkExpirations();
-
-    // Check every 30 seconds
     const interval = setInterval(checkExpirations, 30000);
     return () => clearInterval(interval);
   }, [books]);
 
   const login = async (agentId: string, password: string): Promise<boolean> => {
-    // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800));
 
     if (agentId === 'AG1001' && password === '123456') {
@@ -291,41 +291,125 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.removeItem('agent_profile');
   };
 
-  const markBookAsSold = (bookId: string) => {
-    setBooks(prev =>
-      prev.map(book => {
-        if (book.id === bookId) {
-          // If already expired, do not allow changes
-          if (book.status === 'Unsold by Admin') return book;
-          
-          return {
-            ...book,
-            status: 'Sold',
-            soldDate: new Date().toISOString()
-          } as Book;
+  const fetchAgentBooks = async (limit = 10, offset = 0, append = false) => {
+    const token = localStorage.getItem('agent_token');
+    try {
+      const response = await fetch(`/api/v1/agent/books?limit=${limit}&offset=${offset}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
-        return book;
-      })
-    );
+      });
+      if (!response.ok) return;
+
+      const json = await response.json();
+      const payload = json?.data && !Array.isArray(json.data) ? json.data : json;
+      const rawBooks = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
+      const mappedBooks: Book[] = rawBooks.map((item: any) => {
+        const bookId = item.book_id || item.book_number || `BK${item.id}`;
+        const ticketCount = Number(item.total_tickets || item.tickets_count || item.book?.total_tickets || 0);
+        return {
+          id: String(bookId),
+          apiId: Number(item.id || item.book_id),
+          gameId: String(item.game_id || item.game?.id || ''),
+          gameName: item.game?.game_name || item.game_name || 'Lucky Draw',
+          bookName: item.book_name || item.name || bookId,
+          agentId: String(item.agent_id || agent?.apiId || agent?.id || ''),
+          agentName: item.agent?.agent_name || item.agent_name || agent?.name,
+          tickets: Array.from({ length: ticketCount }, (_, index) => String(item.tickets?.[index]?.ticket_number || item.tickets?.[index] || index + 1)),
+          bookValue: Number(item.book_value || item.book?.book_value || 0),
+          bookNumber: String(item.id || item.book_number || ''),
+          serialNumber: item.serial_number || '',
+          totalTickets: ticketCount,
+          soldTickets: Number(item.sold_tickets || 0),
+          unsoldTickets: Number(item.unsold_tickets || 0),
+          assignedDate: item.assigned_date || item.created_at || '',
+          expiryDate: item.expiry_date || '',
+          createdDate: item.created_at || '',
+          soldDate: item.sold_at || item.sold_date || '',
+          unsoldDate: item.unsold_at || item.unsold_date || '',
+          status: String(item.status || 'Assigned').toLowerCase() === 'sold' ? 'Sold' :
+            String(item.status || '').toLowerCase() === 'unsold' ? 'Unsold' :
+              String(item.status || '').toLowerCase() === 'unsold by admin' ? 'Unsold by Admin' : 'Assigned'
+        };
+      });
+
+      const meta = payload || json;
+      const total = Number(meta.total ?? offset + mappedBooks.length);
+      const perPage = Number(meta.per_page ?? limit);
+      const currentPage = Number(meta.current_page ?? Math.floor(offset / limit) + 1);
+      const lastPage = Number(meta.last_page ?? Math.max(Math.ceil(total / perPage), currentPage));
+      setBooksPagination({
+        total,
+        perPage,
+        currentPage,
+        lastPage,
+        nextPageUrl: meta.next_page_url ?? null,
+        prevPageUrl: meta.prev_page_url ?? null,
+        hasMore: meta.next_page_url !== null && meta.next_page_url !== undefined
+          ? Boolean(meta.next_page_url)
+          : currentPage < lastPage
+      });
+      setBooks(prev => append ? Array.from(new Map([...prev, ...mappedBooks].map(book => [book.id, book])).values()) : mappedBooks);
+    } catch (error) {
+      console.error('API Error fetching agent books:', error);
+    }
   };
 
-  const markBookAsUnsold = (bookId: string) => {
-    setBooks(prev =>
-      prev.map(book => {
-        if (book.id === bookId) {
-          // If already expired, do not allow changes
-          if (book.status === 'Unsold by Admin') return book;
+  const updateBookStatus = async (bookId: string, status: 'Sold' | 'Unsold'): Promise<boolean> => {
+    const book = books.find(item => item.id === bookId);
+    if (!book || book.status === 'Unsold by Admin') return false;
 
-          return {
-            ...book,
-            status: 'Unsold',
-            unsoldDate: new Date().toISOString()
-          } as Book;
-        }
-        return book;
+    const apiBookId = Number(book.apiId || book.bookNumber || book.id.replace(/^BK/i, ''));
+    const storedAgentId = localStorage.getItem('agent_api_id') || localStorage.getItem('agent_id');
+    const apiAgentId = Number(storedAgentId || agent?.apiId || agent?.id?.replace(/\D/g, ''));
+    if (!Number.isInteger(apiBookId) || !Number.isInteger(apiAgentId)) {
+      throw new Error('Book ID or Agent ID is missing for this status update.');
+    }
+
+    const token = localStorage.getItem('agent_token');
+    const response = await fetch(`/api/v1/agent/books/${status.toLowerCase()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        book_id: apiBookId,
+        agent_id: apiAgentId
       })
-    );
+    });
+
+    let result: any = null;
+    try {
+      result = await response.json();
+    } catch {
+      // Some successful action endpoints return an empty response body.
+    }
+
+    if (!response.ok || (result && result.success === false)) {
+      throw new Error(result?.message || `Failed to mark book as ${status.toLowerCase()}.`);
+    }
+
+    const responseBookId = result?.data?.book_id;
+    const responseBookNumber = result?.data?.book_number;
+    const updatedAt = result?.data?.[status === 'Sold' ? 'sold_at' : 'unsold_at'] || new Date().toISOString();
+    setBooks(prev => prev.map(item => {
+      const itemApiId = Number(item.apiId || item.bookNumber || item.id.replace(/^BK/i, ''));
+      const isUpdatedBook = item.id === bookId ||
+        (responseBookId && itemApiId === Number(responseBookId)) ||
+        (responseBookNumber && item.id === responseBookNumber);
+      if (!isUpdatedBook) return item;
+      return status === 'Sold'
+        ? { ...item, status, soldDate: updatedAt } as Book
+        : { ...item, status, unsoldDate: updatedAt } as Book;
+    }));
+    return true;
   };
+
+  const markBookAsSold = (bookId: string) => updateBookStatus(bookId, 'Sold');
+
+  const markBookAsUnsold = (bookId: string) => updateBookStatus(bookId, 'Unsold');
 
   const updateProfile = (profileData: Partial<Agent>) => {
     if (agent) {
@@ -343,6 +427,8 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         books,
         games: DUMMY_GAMES,
         winnings: DUMMY_WINNINGS,
+        booksPagination,
+        fetchAgentBooks,
         login,
         logout,
         markBookAsSold,

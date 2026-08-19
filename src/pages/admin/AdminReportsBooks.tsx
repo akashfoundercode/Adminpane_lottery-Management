@@ -4,7 +4,12 @@ import { Filter, PieChart as PieIcon, AlertCircle } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 export const AdminReportsBooks: React.FC = () => {
-  const { books, games, agents } = useAdmin();
+  const { books, games, fetchBooks, fetchGames } = useAdmin();
+
+  React.useEffect(() => {
+    fetchBooks();
+    fetchGames();
+  }, []);
 
   // Filters
   const [selectedGameId, setSelectedGameId] = useState('All');
@@ -185,13 +190,12 @@ export const AdminReportsBooks: React.FC = () => {
                       <td className="py-2.5 px-2 text-text-primary truncate max-w-[150px]">{b.gameName}</td>
                       <td className="py-2.5 px-2 text-text-secondary">{b.agentName || '-'}</td>
                       <td className="py-2.5 px-2">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                          b.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                          b.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                          b.status === 'Assigned' || b.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
-                          b.status === 'Unsold' ? 'bg-amber-100 text-amber-800' :
-                          'bg-rose-100 text-rose-800'
-                        }`}>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${b.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
+                            b.status === 'Available' ? 'bg-blue-100 text-blue-800' :
+                              b.status === 'Assigned' || b.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
+                                b.status === 'Unsold' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-rose-100 text-rose-800'
+                          }`}>
                           {b.status}
                         </span>
                       </td>

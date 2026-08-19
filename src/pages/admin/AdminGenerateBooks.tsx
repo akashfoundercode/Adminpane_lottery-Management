@@ -6,7 +6,11 @@ import { Sparkles, ArrowLeft, CheckCircle, HelpCircle } from 'lucide-react';
 // @ts-ignore
 import * as XLSX from 'xlsx';
 
-export const AdminGenerateBooks: React.FC = () => {
+interface AdminGenerateBooksProps {
+  onUploaded?: () => void | Promise<void>;
+}
+
+export const AdminGenerateBooks: React.FC<AdminGenerateBooksProps> = ({ onUploaded }) => {
   const { games, importBooks } = useAdmin();
   const { showToast } = useToast();
   const navigate = useNavigate();
@@ -40,10 +44,10 @@ export const AdminGenerateBooks: React.FC = () => {
           const workbook = XLSX.read(data, { type: 'binary' });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          
+
           // Get rows as array of arrays (including header row)
           const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
+
           if (rows.length === 0) {
             reject(new Error('Spreadsheet is empty.'));
             return;
@@ -52,7 +56,7 @@ export const AdminGenerateBooks: React.FC = () => {
           const originalHeaders: string[] = rows[0].map(h => String(h || '').trim());
           const normalizedHeaders = originalHeaders.map(header => {
             const hLower = header.toLowerCase();
-            
+
             // Map common patterns to backend expected header names
             if (hLower === 'ticket_number' || hLower === 'ticket_numbers' || hLower === 'ticketnumber' || hLower.includes('coupon')) {
               return 'ticket_number';
@@ -92,7 +96,7 @@ export const AdminGenerateBooks: React.FC = () => {
 
           // Convert rows back to CSV string
           const csvRows = [];
-          
+
           // Add normalized headers
           csvRows.push(normalizedHeaders.map(h => `"${h.replace(/"/g, '""')}"`).join(','));
 
@@ -100,7 +104,7 @@ export const AdminGenerateBooks: React.FC = () => {
           for (let i = 1; i < rows.length; i++) {
             const row = rows[i];
             if (!row || row.length === 0) continue;
-            
+
             const csvRow = normalizedHeaders.map((_, colIdx) => {
               const val = String(row[colIdx] !== undefined && row[colIdx] !== null ? row[colIdx] : '').trim();
               return `"${val.replace(/"/g, '""')}"`;
@@ -134,12 +138,16 @@ export const AdminGenerateBooks: React.FC = () => {
     try {
       showToast('Parsing and normalizing spreadsheet columns...', 'info');
       const normalizedFile = await processFileAndNormalize(importFile);
-      
+
       showToast('Uploading normalized spreadsheet to API...', 'info');
       await importBooks(selectedGameId, normalizedFile);
-      
+
       showToast('Books and tickets generated successfully via spreadsheet!', 'success');
-      navigate('/admin/books');
+      if (onUploaded) {
+        await onUploaded();
+      } else {
+        navigate('/admin/books');
+      }
     } catch (err: any) {
       showToast(err.message || 'Spreadsheet import failed.', 'error');
     }
@@ -166,8 +174,8 @@ export const AdminGenerateBooks: React.FC = () => {
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
-          <h2 className="text-[20px] font-bold text-text-primary font-display">Generate Ticket Books</h2>
-          <p className="text-xs text-text-secondary">Generate serial-numbered books and tickets in batch for a game</p>
+          <h2 className="text-[20px] font-bold text-text-primary font-display">Upload Ticket Books</h2>
+          <p className="text-xs text-text-secondary">Upload serial-numbered books and tickets in batch for a game</p>
         </div>
       </div>
 
@@ -227,7 +235,7 @@ export const AdminGenerateBooks: React.FC = () => {
               className="w-full inline-flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
-              <span>Import and Generate Books</span>
+              <span>Upload Books</span>
             </button>
           </form>
         </div>
@@ -241,7 +249,7 @@ export const AdminGenerateBooks: React.FC = () => {
             <p>
               Please upload a spreadsheet file containing the books and ticket numbers to generate them on the backend database.
             </p>
-            
+
             <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
               <span className="font-bold text-[10px] text-text-primary uppercase tracking-wider block">
                 Required Sheet Columns:

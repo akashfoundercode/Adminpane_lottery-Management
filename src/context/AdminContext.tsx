@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Game, Agent, Book, Winning, Prize, Result, AssignmentHistory } from '../types';
+import { Game, Agent, Book, Winning, Prize, Result, AssignmentHistory, ListPagination } from '../types';
 
 interface AdminContextType {
   // Auth
@@ -16,12 +16,19 @@ interface AdminContextType {
   prizes: Prize[];
   results: Result[];
   assignmentHistory: AssignmentHistory[];
+  booksTotal: number;
+  ticketsTotal: number;
+  booksPagination: ListPagination;
+  gamesPagination: ListPagination;
+  agentsPagination: ListPagination;
+  assignmentHistoryPagination: ListPagination;
+  resultsPagination: ListPagination;
 
-  fetchGames: () => Promise<void>;
-  fetchBooks: () => Promise<void>;
-  fetchAgents: () => Promise<void>;
-  fetchAssignmentHistory: () => Promise<void>;
-  fetchResults: () => Promise<void>;
+  fetchGames: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
+  fetchBooks: (limit?: number, page?: number, append?: boolean) => Promise<void>;
+  fetchAgents: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
+  fetchAssignmentHistory: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
+  fetchResults: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
   createGame: (game: Omit<Game, 'id'>) => Promise<void>;
   updateGame: (id: string, updatedGame: Partial<Game>) => void;
   deleteGame: (id: string) => void;
@@ -31,8 +38,9 @@ interface AdminContextType {
   importBooks: (gameId: string, file: File) => Promise<void>;
   assignBooks: (gameId: string, bookIds: string[], agentId: string, expiryDate: string) => Promise<void>;
   revokeAssignment: (bookId: string) => void;
+  updateBookStatus: (bookId: string, status: 'Sold' | 'Unsold') => Promise<void>;
 
-  createAgent: (agent: Omit<Agent, 'id' | 'agentId' | 'status'> & { password?: string }) => Promise<void>;
+  createAgent: (agent: Omit<Agent, 'id' | 'agentId'> & { password: string }) => Promise<void>;
   updateAgent: (id: string, updatedAgent: Partial<Agent>) => void;
   toggleAgentStatus: (id: string) => void;
 
@@ -53,6 +61,41 @@ interface AdminContextType {
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
+
+const EMPTY_PAGINATION: ListPagination = {
+  total: 0,
+  perPage: 10,
+  currentPage: 1,
+  lastPage: 1,
+  nextPageUrl: null,
+  prevPageUrl: null,
+  hasMore: false
+};
+
+const readPagination = (json: any, itemCount: number, limit: number, offset: number): ListPagination => {
+  const meta = json?.data && !Array.isArray(json.data) ? json.data : json;
+  const total = Number(meta?.total ?? meta?.total_count ?? meta?.total_items ?? offset + itemCount);
+  const perPage = Number(meta?.per_page ?? meta?.perPage ?? limit);
+  const currentPage = Number(meta?.current_page ?? Math.floor(offset / limit) + 1);
+  const lastPage = Number(meta?.last_page ?? Math.max(Math.ceil(total / perPage), currentPage));
+  const nextPageUrl = meta?.next_page_url ?? null;
+  const prevPageUrl = meta?.prev_page_url ?? null;
+  return {
+    total,
+    perPage,
+    currentPage,
+    lastPage,
+    nextPageUrl,
+    prevPageUrl,
+    hasMore: nextPageUrl !== null ? Boolean(nextPageUrl) : currentPage < lastPage
+  };
+};
+
+const appendUnique = <T extends { id: string }>(current: T[], incoming: T[]) => {
+  const byId = new Map(current.map(item => [item.id, item]));
+  incoming.forEach(item => byId.set(item.id, item));
+  return Array.from(byId.values());
+};
 
 // Core Mock Data matching screen statistics
 const INITIAL_GAMES: Game[] = [
@@ -122,15 +165,15 @@ const generateGlobalMockBooks = (games: Game[], agents: Agent[]): Book[] => {
   // OR we can generate all 1250 books. 1250 books with 10 tickets each is just 1250 objects.
   // Let's actually generate all 1250 books. It runs in a fraction of a millisecond and is fully searchable!
   // Let's do that!
-  
+
   let idCounter = 1000;
-  
+
   statusList.forEach(status => {
     const count = targetCounts[status];
     for (let i = 0; i < count; i++) {
       idCounter++;
       const bookId = `BK${idCounter}`;
-      
+
       // Select game based on index to distribute
       // GM001 (Summer Lucky Draw - Live) - gets mostly Live/Sold/Available
       // GM002 (Mega Bumper - Upcoming) - gets mostly Available/Sold
@@ -160,13 +203,13 @@ const generateGlobalMockBooks = (games: Game[], agents: Agent[]): Book[] => {
       }
 
       const game = games[gameIdx] || games[0];
-      
+
       // Assign Agent (Ramesh, Suresh, Amit, Vikash, Pawan)
       // রমেশ কুমার gets most first party, etc.
       let agentIdx = -1;
       let agentId = '';
       let agentName = '';
-      
+
       if (status !== 'Available') {
         // Distribute to agents:
         // Ramesh: 120 books, 110 sold, 10 unsold/expired
@@ -249,22 +292,29 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const getFullImageUrl = (path: string | null | undefined): string => {
     if (!path) return 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?w=600';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
-    
+
     let cleanPath = path;
     if (cleanPath.startsWith('/')) {
       cleanPath = cleanPath.substring(1);
     }
-    
+
     if (!cleanPath.startsWith('storage/')) {
       cleanPath = 'storage/' + cleanPath;
     }
-    
+
     return '/' + cleanPath;
   };
 
   const [games, setGames] = useState<Game[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [booksTotal, setBooksTotal] = useState(0);
+  const [ticketsTotal, setTicketsTotal] = useState(0);
+  const [booksPagination, setBooksPagination] = useState<ListPagination>(EMPTY_PAGINATION);
+  const [gamesPagination, setGamesPagination] = useState<ListPagination>(EMPTY_PAGINATION);
+  const [agentsPagination, setAgentsPagination] = useState<ListPagination>(EMPTY_PAGINATION);
+  const [assignmentHistoryPagination, setAssignmentHistoryPagination] = useState<ListPagination>(EMPTY_PAGINATION);
+  const [resultsPagination, setResultsPagination] = useState<ListPagination>(EMPTY_PAGINATION);
 
   const [winnings, setWinnings] = useState<Winning[]>(() => {
     const stored = localStorage.getItem('lucky_draw_winnings');
@@ -284,7 +334,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [assignmentHistory, setAssignmentHistory] = useState<AssignmentHistory[]>(() => {
     const stored = localStorage.getItem('lucky_draw_assignment_history');
     if (stored) return JSON.parse(stored);
-    
+
     // Seed initial assignment history based on the initial books that are assigned
     const history: AssignmentHistory[] = [];
     let counter = 1;
@@ -334,10 +384,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('lucky_draw_assignment_history', JSON.stringify(assignmentHistory));
   }, [assignmentHistory]);
 
-  const fetchGames = async () => {
+  const fetchGames = async (limit = 10000, offset = 0, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     try {
-      const response = await fetch('/api/v1/admin/games?per_page=10000', {
+      const response = await fetch(`/api/v1/admin/games?limit=${limit}&offset=${offset}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -346,7 +396,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (response.ok) {
         const json = await response.json();
         let rawGames: any[] = [];
-        
+
         if (json.success && json.data) {
           if (Array.isArray(json.data.data)) {
             rawGames = json.data.data;
@@ -383,7 +433,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               facebookLiveUrl: g.facebook_live_url || ''
             };
           });
-          setGames(mappedGames);
+          setGames(prev => append ? appendUnique(prev, mappedGames) : mappedGames);
+          setGamesPagination(readPagination(json, mappedGames.length, limit, offset));
         }
       }
     } catch (err) {
@@ -391,10 +442,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const fetchBooks = async () => {
+  const fetchBooks = async (limit = 50, page = 1, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     try {
-      const response = await fetch('/api/v1/admin/books?per_page=10000', {
+      const response = await fetch(`/api/v1/admin/books?page=${page}&limit=${limit}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -412,6 +463,25 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
         }
 
+        const pg = json.pagination ?? (json.data && !Array.isArray(json.data) ? json.data : json);
+        const total = Number(pg.total ?? 0);
+        const lastPage = Number(pg.last_page ?? 1);
+        const currentPage = Number(pg.current_page ?? page);
+        const hasMore = Boolean(pg.has_more ?? (currentPage < lastPage));
+
+        setBooksTotal(total);
+        const perBookTickets = Number(pg.total_tickets ?? rawBooks[0]?.total_tickets ?? 10);
+        setTicketsTotal(Number(pg.total_tickets_count ?? (total * perBookTickets)));
+        setBooksPagination({
+          total,
+          perPage: limit,
+          currentPage,
+          lastPage,
+          nextPageUrl: hasMore ? String(currentPage + 1) : null,
+          prevPageUrl: currentPage > 1 ? String(currentPage - 1) : null,
+          hasMore
+        });
+
         if (json.success) {
           const mappedBooks: Book[] = rawBooks.map((b: any) => {
             let mappedStatus: Book['status'] = 'Available';
@@ -423,8 +493,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             else if (apiStatus === 'unsold by admin') mappedStatus = 'Unsold by Admin';
 
             const gameName = b.game?.game_name || 'Lucky Draw';
+            const bookName = b.book_name || b.name || b.book?.book_name || b.book_id || `BK${b.id}`;
             const ticketCount = Number(b.total_tickets || 10);
-            
+
             const tickets: string[] = [];
             for (let i = 0; i < ticketCount; i++) {
               tickets.push(String(50000 + (b.id * ticketCount) + i));
@@ -432,10 +503,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             return {
               id: b.book_id || `BK${b.id}`,
+              apiId: Number(b.id),
               gameId: String(b.game_id),
               gameName: gameName,
-              agentId: b.agent_id ? String(b.agent_id) : '',
-              agentName: b.agent_name || '',
+              bookName: bookName,
+              agentId: b.agent_id ? String(b.agent_id) : (b.agent?.agent_id ? String(b.agent.agent_id) : ''),
+              agentName: b.agent_name || b.agent?.agent_name || '',
               tickets: tickets,
               bookValue: ticketCount * 100,
               bookNumber: String(b.id),
@@ -446,10 +519,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               assignedDate: b.assigned_date || '',
               expiryDate: b.expiry_date || '',
               createdDate: b.created_at || new Date().toISOString(),
+              soldDate: b.sold_at || b.sold_date || '',
+              unsoldDate: b.unsold_at || b.unsold_date || '',
+              expiredDate: b.expired_at || b.expired_date || '',
               status: mappedStatus
             };
           });
-          setBooks(mappedBooks);
+          setBooks(prev => append ? appendUnique(prev, mappedBooks) : mappedBooks);
         }
       }
     } catch (err) {
@@ -457,10 +533,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const fetchAgents = async () => {
+  const fetchAgents = async (limit = 10000, offset = 0, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     try {
-      const response = await fetch('/api/v1/admin/agents?per_page=10000', {
+      const response = await fetch(`/api/v1/admin/agents?limit=${limit}&offset=${offset}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -494,7 +570,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               status: mappedStatus
             };
           });
-          setAgents(mappedAgents);
+          setAgents(prev => append ? appendUnique(prev, mappedAgents) : mappedAgents);
+          setAgentsPagination(readPagination(json, mappedAgents.length, limit, offset));
         }
       }
     } catch (err) {
@@ -502,10 +579,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const fetchAssignmentHistory = async () => {
+  const fetchAssignmentHistory = async (limit = 10000, offset = 0, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     try {
-      const response = await fetch('/api/v1/admin/book-assignments/history?per_page=10000', {
+      const response = await fetch(`/api/v1/admin/book-assignments/history?limit=${limit}&offset=${offset}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -514,7 +591,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (response.ok) {
         const json = await response.json();
         let rawHistory: any[] = [];
-        
+
         if (json.success && json.data) {
           if (Array.isArray(json.data.data)) {
             rawHistory = json.data.data;
@@ -526,10 +603,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (json.success) {
           const mappedHistory: AssignmentHistory[] = rawHistory.map((h: any) => {
             const bookCode = h.book?.book_id || h.book_id || String(h.book_id || '');
+            const bookName = h.book?.book_name || h.book?.name || h.book_name || bookCode;
             const gameName = h.game?.game_name || h.book?.game?.game_name || 'Mega Lucky Draw';
             const agentName = h.agent?.agent_name || h.agent_name || 'Agent User';
+            const agentId = h.agent?.agent_id || h.agent_id || '';
             const agentType = (h.agent?.agent_type || h.agent_type) === 'first_party' ? 'First Party' : 'Third Party';
-            
+
             let mappedStatus = 'Assigned';
             const apiStatus = String(h.status || '').toLowerCase();
             if (apiStatus === 'assigned' || apiStatus === 'active') mappedStatus = 'Assigned';
@@ -541,15 +620,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             return {
               id: String(h.id),
               bookId: bookCode,
+              bookName,
               gameName: gameName,
               agentName: agentName,
+              agentId: String(agentId),
               agentType: agentType as any,
               assignedDate: h.assigned_date || h.created_at || new Date().toISOString(),
               expiryDate: h.expiry_date || '',
               status: mappedStatus
             };
           });
-          setAssignmentHistory(mappedHistory);
+          setAssignmentHistory(prev => append ? appendUnique(prev, mappedHistory) : mappedHistory);
+          setAssignmentHistoryPagination(readPagination(json, mappedHistory.length, limit, offset));
         }
       }
     } catch (err) {
@@ -557,10 +639,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const fetchResults = async () => {
+  const fetchResults = async (limit = 10000, offset = 0, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     try {
-      const response = await fetch('/api/v1/admin/results?per_page=10000', {
+      const response = await fetch(`/api/v1/admin/results?limit=${limit}&offset=${offset}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -593,7 +675,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               publishedDate: r.created_at || ''
             };
           });
-          setResults(mappedResults);
+          setResults(prev => append ? appendUnique(prev, mappedResults) : mappedResults);
+          setResultsPagination(readPagination(json, mappedResults.length, limit, offset));
         }
       }
     } catch (err) {
@@ -605,7 +688,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (isAdminAuthenticated) {
       fetchGames();
-      fetchBooks();
+      fetchBooks(50, 1, false);
       fetchAgents();
       fetchAssignmentHistory();
       fetchResults();
@@ -627,12 +710,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       const data = await response.json();
-      
+
       // Parse token from potential response schemas
-      const receivedToken = data.token || 
-                            data.access_token || 
-                            (data.data && (data.data.token || data.data.access_token)) || 
-                            '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d'; // fallback to user token
+      const receivedToken = data.token ||
+        data.access_token ||
+        (data.data && (data.data.token || data.data.access_token)) ||
+        '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d'; // fallback to user token
 
       // Extract details
       const adminName = (data.admin && data.admin.name) || (data.data && data.data.name) || 'Admin User';
@@ -641,11 +724,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       setIsAdminAuthenticated(true);
       setAdminUser(profile);
-      
+
       localStorage.setItem('admin_auth', 'true');
       localStorage.setItem('admin_profile', JSON.stringify(profile));
       localStorage.setItem('admin_token', receivedToken);
-      
+
       return true;
     } catch (err: any) {
       console.error('API Error in adminLogin:', err);
@@ -680,7 +763,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const createGame = async (gameData: Omit<Game, 'id'>) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     const apiStatus = gameData.status === 'Live' ? 'active' : 'inactive';
-    
+
     let formattedTime = gameData.drawTime;
     if (formattedTime && formattedTime.split(':').length === 2) {
       formattedTime += ':00';
@@ -788,7 +871,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     for (let i = 0; i < count; i++) {
       const bookNum = startBookNumber + i;
       const bookId = `BK${String(1000 + books.length + i + 1)}`;
-      
+
       const tickets: string[] = [];
       for (let t = 0; t < bookSize; t++) {
         ticketCounter++;
@@ -879,7 +962,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Book Assignment
   const assignBooks = async (gameId: string, bookIds: string[], agentId: string, expiryDate: string) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
-    
+
     // Find numeric database IDs for books
     const numericBookIds = bookIds.map(bId => {
       const bookObj = books.find(b => b.id === bId);
@@ -911,7 +994,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         try {
           const parsed = JSON.parse(errorText);
           if (parsed.message) errMsg = parsed.message;
-        } catch (e) {}
+        } catch (e) { }
         throw new Error(errMsg);
       }
 
@@ -927,7 +1010,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const revokeAssignment = (bookId: string) => {
     let oldBook = books.find(b => b.id === bookId);
-    
+
     setBooks(prev => prev.map(book => {
       if (book.id === bookId) {
         return {
@@ -957,24 +1040,64 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const updateBookStatus = async (bookId: string, status: 'Sold' | 'Unsold') => {
+    const book = books.find(item => item.id === bookId);
+    const apiBookId = Number(book?.apiId || book?.bookNumber || book?.id.replace(/^BK/i, ''));
+    if (!book || !Number.isInteger(apiBookId)) {
+      throw new Error('Book ID is missing or invalid.');
+    }
+
+    const token = localStorage.getItem('admin_token');
+    const response = await fetch('/api/v1/admin/books/update-status', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({
+        book_id: apiBookId,
+        status: status.toLowerCase()
+      })
+    });
+
+    let result: any = null;
+    try {
+      result = await response.json();
+    } catch {
+      // The API may return an empty success response.
+    }
+
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || `Failed to update book status to ${status}.`);
+    }
+
+    const updatedStatus = result?.data?.status?.toLowerCase() === 'sold' ? 'Sold' : 'Unsold';
+    setBooks(prev => prev.map(item => item.id === bookId ? {
+      ...item,
+      status: updatedStatus,
+      ...(updatedStatus === 'Sold' ? { soldDate: result?.data?.sold_at || new Date().toISOString() } : { unsoldDate: result?.data?.unsold_at || new Date().toISOString() })
+    } : item));
+    await fetchBooks();
+  };
+
   // Agent CRUD
-  const createAgent = async (agentData: Omit<Agent, 'id' | 'agentId' | 'status'> & { password?: string }) => {
+  const createAgent = async (agentData: Omit<Agent, 'id' | 'agentId'> & { password: string }) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
-    
+
     // Auto-generate agent ID if not present
     const generatedAgentId = `AG1${String(agents.length + 1).padStart(3, '0')}`;
     const apiType = agentData.agentType === 'First Party' ? 'first_party' : 'third_party';
-    
+
     const payload = {
       agent_name: agentData.name,
       agent_id: generatedAgentId,
       mobile_number: agentData.mobile,
-      whatsapp_number: agentData.whatsapp || agentData.mobile,
+      whatsapp_number: agentData.whatsapp,
       address: agentData.address,
       agent_type: apiType,
       email: agentData.email,
-      password: agentData.password || 'password123',
-      status: 'active'
+      password: agentData.password,
+      status: agentData.status === 'Active' ? 'active' : 'inactive'
     };
 
     try {
@@ -1031,15 +1154,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const createResult = async (resultData: Omit<Result, 'id' | 'gameName' | 'status' | 'publishedDate'>) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     const formData = new FormData();
-    
+
     // Find numeric game database ID
     const gameObj = games.find(g => g.id === resultData.gameId);
     const numericGameId = gameObj ? Number(gameObj.id) : Number(resultData.gameId);
-    
+
     formData.append('game_id', String(numericGameId));
     formData.append('result_date', resultData.drawDate);
     formData.append('title', resultData.title || 'Daily Lottery Result');
-    
+
     if (resultData.imageFile) {
       formData.append('result_image', resultData.imageFile);
     } else {
@@ -1064,7 +1187,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         try {
           const parsed = JSON.parse(errorText);
           if (parsed.message) errMsg = parsed.message;
-        } catch (e) {}
+        } catch (e) { }
         throw new Error(errMsg);
       }
 
@@ -1125,6 +1248,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       adminLogout,
       games,
       books,
+      booksTotal,
+      ticketsTotal,
+      booksPagination,
+      gamesPagination,
+      agentsPagination,
+      assignmentHistoryPagination,
+      resultsPagination,
       agents,
       winnings,
       prizes,
@@ -1143,6 +1273,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       importBooks,
       assignBooks,
       revokeAssignment,
+      updateBookStatus,
       createAgent,
       updateAgent,
       toggleAgentStatus,

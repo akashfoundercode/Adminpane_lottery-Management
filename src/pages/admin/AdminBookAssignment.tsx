@@ -28,7 +28,7 @@ export const AdminBookAssignment: React.FC = () => {
   }, [books, selectedGameId]);
 
   const filteredAvailableBooks = useMemo(() => {
-    return availableBooks.filter(b => 
+    return availableBooks.filter(b =>
       b.id.toLowerCase().includes(bookSearchTerm.toLowerCase()) ||
       (b.serialNumber && b.serialNumber.toLowerCase().includes(bookSearchTerm.toLowerCase()))
     );
@@ -158,7 +158,7 @@ export const AdminBookAssignment: React.FC = () => {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-[160px] overflow-y-auto space-y-1.5">
                   {availableBooks.length === 0 ? (
                     <div className="text-center py-6 text-text-secondary text-[11px] italic">
-                      No available books found. Generate books first!
+                      No available books found. Upload books first!
                     </div>
                   ) : filteredAvailableBooks.length === 0 ? (
                     <div className="text-center py-6 text-text-secondary text-[11px] italic">
@@ -172,9 +172,8 @@ export const AdminBookAssignment: React.FC = () => {
                           type="button"
                           key={b.id}
                           onClick={() => handleToggleBook(b.id)}
-                          className={`flex items-center gap-2 w-full p-2 rounded-lg text-left text-xs transition-colors border ${
-                            isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold' : 'bg-white border-slate-100 text-slate-700'
-                          }`}
+                          className={`flex items-center gap-2 w-full p-2 rounded-lg text-left text-xs transition-colors border ${isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold' : 'bg-white border-slate-100 text-slate-700'
+                            }`}
                         >
                           {isSelected ? (
                             <CheckSquare className="w-4 h-4 text-indigo-600 flex-shrink-0" />
@@ -278,9 +277,8 @@ export const AdminBookAssignment: React.FC = () => {
                       <td className="py-2.5 px-3 font-semibold text-text-primary max-w-[130px] truncate">{b.gameName}</td>
                       <td className="py-2.5 px-3 font-medium text-text-primary">{b.agentName}</td>
                       <td className="py-2.5 px-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                          b.id.includes('BK110') ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
-                        }`}>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${b.id.includes('BK110') ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                          }`}>
                           {b.id.includes('BK110') ? 'Third Party' : 'First Party'}
                         </span>
                       </td>
