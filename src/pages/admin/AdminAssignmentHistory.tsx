@@ -133,6 +133,7 @@ export const AdminAssignmentHistory: React.FC = () => {
                   <th className="py-3.5 px-4">Assigned Date</th>
                   <th className="py-3.5 px-4">Expiry Date</th>
                   <th className="py-3.5 px-4">Status / Transition</th>
+                  <th className="py-3.5 pc-4">Sold/Unsold</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-light">
