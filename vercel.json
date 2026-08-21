@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://test.hashoster.co.in/api/:path*"
+        },
+        {
+            "source": "/storage/:path*",
+            "destination": "https://test.hashoster.co.in/storage/:path*"
+        }
+    ]
+}
