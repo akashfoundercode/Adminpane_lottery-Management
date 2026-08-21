@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { ArrowLeft, Save, Sparkles, Upload } from 'lucide-react';
+import { ArrowLeft, Save, Upload } from 'lucide-react';
 
 export const AdminGameCreate: React.FC = () => {
-  const { createGame } = useAdmin();
+  const { createGame, updateGame, games } = useAdmin();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const editGame = editId ? games.find(g => g.id === editId) : null;
 
   const [name, setName] = useState('');
   const [gameCode, setGameCode] = useState('');
@@ -25,6 +28,37 @@ export const AdminGameCreate: React.FC = () => {
   const [youtubeLiveUrl, setYoutubeLiveUrl] = useState('https://youtube.com/live/demo');
   const [facebookLiveUrl, setFacebookLiveUrl] = useState('https://facebook.com/live/demo');
 
+  const generateGameCode = (gameName: string) => {
+    const prefix = gameName
+      .trim()
+      .split(/\s+/)
+      .map(word => word[0])
+      .join('')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .slice(0, 3)
+      .toUpperCase() || 'GM';
+
+    return `${prefix}${Date.now().toString().slice(-4)}`;
+  };
+
+  useEffect(() => {
+    if (editGame) {
+      setName(editGame.name || '');
+      setGameCode(editGame.gameCode || '');
+      setTicketPrice(editGame.ticketPrice || 100);
+      setBookSize(editGame.bookSize || 10);
+      setDrawDate(editGame.drawDate || '');
+      setDrawTime(editGame.drawTime?.slice(0, 5) || '18:00');
+      setStartDate(editGame.startDate || '');
+      setEndDate(editGame.endDate || '');
+      setStatus((editGame.status === 'Live' ? 'Live' : 'Upcoming') as any);
+      setDescription(editGame.description || '');
+      setImage(editGame.image || '');
+      setYoutubeLiveUrl(editGame.youtubeLiveUrl || 'https://youtube.com/live/demo');
+      setFacebookLiveUrl(editGame.facebookLiveUrl || 'https://facebook.com/live/demo');
+    }
+  }, [editId, games.length]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -40,34 +74,55 @@ export const AdminGameCreate: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !gameCode || !drawDate || !startDate || !endDate) {
+    if (!name || !drawDate) {
       showToast('Please fill in all required fields.', 'error');
       return;
     }
 
-    try {
-      await createGame({
-        name,
-        gameCode: gameCode.toUpperCase(),
-        ticketPrice: Number(ticketPrice),
-        bookSize: Number(bookSize),
-        totalBooks: 0,
-        drawDate,
-        drawTime,
-        startDate,
-        endDate,
-        status,
-        description,
-        image: image || 'game1.png',
-        imageFile: imageFile || undefined,
-        youtubeLiveUrl,
-        facebookLiveUrl
-      });
+    const normalizedGameCode = (gameCode || generateGameCode(name)).toUpperCase();
 
-      showToast('Game created successfully on API!', 'success');
+    try {
+      if (editId && editGame) {
+        await updateGame(editId, {
+          name,
+          gameCode: normalizedGameCode,
+          ticketPrice: Number(ticketPrice),
+          bookSize: Number(bookSize),
+          drawDate,
+          drawTime,
+          startDate,
+          endDate,
+          status,
+          description,
+          image: image || editGame.image || 'game1.png',
+          imageFile: imageFile || undefined,
+          youtubeLiveUrl,
+          facebookLiveUrl
+        });
+        showToast('Game updated successfully!', 'success');
+      } else {
+        await createGame({
+          name,
+          gameCode: normalizedGameCode,
+          ticketPrice: Number(ticketPrice),
+          bookSize: Number(bookSize),
+          totalBooks: 0,
+          drawDate,
+          drawTime,
+          startDate,
+          endDate,
+          status,
+          description,
+          image: image || 'game1.png',
+          imageFile: imageFile || undefined,
+          youtubeLiveUrl,
+          facebookLiveUrl
+        });
+        showToast('Game created successfully!', 'success');
+      }
       navigate('/admin/games');
     } catch (err: any) {
-      showToast(err.message || 'Failed to create game on API.', 'error');
+      showToast(err.message || 'Failed to save game.', 'error');
     }
   };
 
@@ -81,8 +136,8 @@ export const AdminGameCreate: React.FC = () => {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <h2 className="text-[20px] font-bold text-text-primary font-display">Create New Game</h2>
-          <p className="text-xs text-text-secondary">Add a new lottery draw with specifications</p>
+          <h2 className="text-[20px] font-bold text-text-primary font-display">{editGame ? 'Edit Game' : 'Create New Game'}</h2>
+          <p className="text-xs text-text-secondary">{editGame ? `Editing: ${editGame.name}` : 'Add a new lottery draw with specifications'}</p>
         </div>
       </div>
 
@@ -104,66 +159,8 @@ export const AdminGameCreate: React.FC = () => {
               />
             </div>
 
-            {/* Game Code */}
-            <div>
-              <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
-                Game Code (Uppercase) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={gameCode}
-                onChange={(e) => setGameCode(e.target.value.toUpperCase())}
-                placeholder="e.g. DSD300"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary font-mono"
-              />
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
-                Initial Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white text-text-primary font-semibold appearance-none cursor-pointer"
-              >
-                <option value="Upcoming">Upcoming</option>
-                <option value="Live">Live</option>
-              </select>
-            </div>
-
             {/* Ticket Price */}
-            <div>
-              <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
-                Ticket Price (₹) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                required
-                min="10"
-                value={ticketPrice}
-                onChange={(e) => setTicketPrice(Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary font-bold"
-              />
-            </div>
-
             {/* Book Size */}
-            <div>
-              <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
-                Book Size (Tickets per Book) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="number"
-                required
-                min="5"
-                max="100"
-                value={bookSize}
-                onChange={(e) => setBookSize(Number(e.target.value))}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary font-bold"
-              />
-            </div>
 
             {/* Start Date */}
             <div>
@@ -303,7 +300,7 @@ export const AdminGameCreate: React.FC = () => {
               className="inline-flex items-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              <span>Save Game</span>
+              <span>{editGame ? 'Update Game' : 'Save Game'}</span>
             </button>
           </div>
         </form>

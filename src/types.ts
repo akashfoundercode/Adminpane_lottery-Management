@@ -83,6 +83,22 @@ export interface Prize {
   status: 'Active' | 'Inactive';
 }
 
+export interface ResultPrize {
+  id?: string;
+  rank: number;
+  prize_type?: 'book_winner' | 'ticket_winner';
+  prize_name?: string;
+  book_prize_name?: string;
+  ticket_prize_name?: string;
+  book_prize_amount?: number;
+  ticket_prize_amount?: number;
+  prize_image?: string | File;
+  total_books_sold?: number;
+  total_tickets?: number;
+  book_price?: number;
+  ticket_price?: number;
+}
+
 export interface Result {
   id: string;
   gameId: string;
@@ -93,6 +109,9 @@ export interface Result {
   title?: string;
   status: 'Draft' | 'Published';
   publishedDate?: string;
+  updatedAt?: string;
+  deletedAt?: string;
+  prizes?: ResultPrize[];
 }
 
 export interface AssignmentHistory {

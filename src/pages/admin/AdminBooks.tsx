@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { Search, Filter, Eye, AlertCircle, UploadCloud, X } from 'lucide-react';
 import AdminGenerateBooks from './AdminGenerateBooks';
+import { PageLoader } from '../../components/PageLoader';
 
 export const AdminBooks: React.FC = () => {
-    const { books, booksPagination, games, fetchBooks } = useAdmin();
+    const { books, booksPagination, games, fetchBooks, loadingBooks } = useAdmin();
     const [searchTerm, setSearchTerm] = useState('');
     const [gameFilter, setGameFilter] = useState('All');
     const [statusFilter, setStatusFilter] = useState('All');
@@ -66,6 +67,33 @@ export const AdminBooks: React.FC = () => {
                 </button>
             </div>
 
+            {/* Game Filter Pills */}
+            <div className="flex flex-wrap gap-2 bg-white px-4 pt-4 pb-2 rounded-xl border border-border-light shadow-sm">
+                <button
+                    onClick={() => { setGameFilter('All'); resetList(); }}
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                        gameFilter === 'All'
+                            ? 'bg-[#6366f1] text-white'
+                            : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
+                    }`}
+                >
+                    All Games
+                </button>
+                {games.map(game => (
+                    <button
+                        key={game.id}
+                        onClick={() => { setGameFilter(game.id); resetList(); }}
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                            gameFilter === game.id
+                                ? 'bg-[#6366f1] text-white'
+                                : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
+                        }`}
+                    >
+                        {game.name}
+                    </button>
+                ))}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-4 rounded-xl border border-border-light shadow-sm">
                 <div className="relative">
                     <input type="text" placeholder="Search by ID, SN, Agent..." value={searchTerm} onChange={event => { setSearchTerm(event.target.value); resetList(); }} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-text-primary placeholder-slate-400" />
@@ -92,8 +120,9 @@ export const AdminBooks: React.FC = () => {
                 </div>
             </div>
 
+            {/* TABLE */}
             <div className="bg-white rounded-xl border border-border-light shadow-sm overflow-hidden">
-                {filteredBooks.length === 0 ? (
+                {loadingBooks ? <PageLoader /> : filteredBooks.length === 0 ? (
                     <div className="p-8 text-center"><AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-2" /><p className="text-xs font-semibold text-text-primary">No books found</p></div>
                 ) : (
                     <div className="overflow-x-auto">

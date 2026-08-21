@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Save, RefreshCw, LogOut, ShieldAlert, Settings, User, Key, Bell, Database } from 'lucide-react';
+import { Save, RefreshCw, LogOut, ShieldAlert, Settings, User, Key, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const AdminSettings: React.FC = () => {
@@ -17,11 +17,6 @@ export const AdminSettings: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
-  // Notifications state
-  const [notifSales, setNotifSales] = useState(true);
-  const [notifWinner, setNotifWinner] = useState(true);
-  const [notifAgent, setNotifAgent] = useState(false);
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,53 +179,6 @@ export const AdminSettings: React.FC = () => {
             </form>
           </div>
 
-          {/* NOTIFICATION SETTINGS */}
-          <div className="premium-card p-5 bg-white border border-border-light shadow-sm">
-            <h3 className="font-display font-semibold text-text-primary text-xs uppercase tracking-wider border-b border-border-light pb-2 mb-4 flex items-center gap-1.5">
-              <Bell className="w-4 h-4 text-indigo-500" />
-              <span>Email & Alert Channels</span>
-            </h3>
-            <div className="space-y-3.5 text-xs text-text-primary">
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={notifSales}
-                  onChange={(e) => setNotifSales(e.target.checked)}
-                  className="rounded text-[#6366f1] focus:ring-indigo-500 w-4 h-4"
-                />
-                <div className="flex flex-col">
-                  <span className="font-bold">Sales Milestones</span>
-                  <span className="text-[10px] text-text-secondary">Get email notifications when agents achieve 100% sales on a book</span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={notifWinner}
-                  onChange={(e) => setNotifWinner(e.target.checked)}
-                  className="rounded text-[#6366f1] focus:ring-indigo-500 w-4 h-4"
-                />
-                <div className="flex flex-col">
-                  <span className="font-bold">Claim Verifications</span>
-                  <span className="text-[10px] text-text-secondary">Notify super-admin immediately when a 1st prize claim is submitted</span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={notifAgent}
-                  onChange={(e) => setNotifAgent(e.target.checked)}
-                  className="rounded text-[#6366f1] focus:ring-indigo-500 w-4 h-4"
-                />
-                <div className="flex flex-col">
-                  <span className="font-bold">Agent Onboarding alerts</span>
-                  <span className="text-[10px] text-text-secondary">Email log every time a Third Party agent activates their device key</span>
-                </div>
-              </label>
-            </div>
-          </div>
         </div>
       </div>
     </div>

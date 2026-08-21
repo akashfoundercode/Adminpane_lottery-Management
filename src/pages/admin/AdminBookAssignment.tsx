@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { UserCheck, ShieldAlert, XCircle, Search, Calendar, CheckSquare, Square } from 'lucide-react';
+import { Book } from '../../types';
 
 export const AdminBookAssignment: React.FC = () => {
   const { games, books, agents, assignBooks, revokeAssignment } = useAdmin();
@@ -10,22 +11,53 @@ export const AdminBookAssignment: React.FC = () => {
   const [selectedGameId, setSelectedGameId] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [selectedBookIds, setSelectedBookIds] = useState<string[]>([]);
-  const [expiryDate, setExpiryDate] = useState(() => {
-    // Default to 7 days from now
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
-  });
+  const [expiryDate] = useState('');
   const [bookSearchTerm, setBookSearchTerm] = useState('');
+  const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
+  const [loadingBooks, setLoadingBooks] = useState(false);
 
   // Derived agent
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
-  // Available books for the selected game
-  const availableBooks = useMemo(() => {
-    if (!selectedGameId) return [];
-    return books.filter(b => b.gameId === selectedGameId && b.status === 'Available');
-  }, [books, selectedGameId]);
+  // Fetch available books from API when game changes
+  useEffect(() => {
+    if (!selectedGameId) { setAvailableBooks([]); return; }
+    const token = localStorage.getItem('admin_token') || '';
+    setLoadingBooks(true);
+    fetch(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=200`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(json => {
+        const raw: any[] = Array.isArray(json.data?.data) ? json.data.data
+          : Array.isArray(json.data) ? json.data : [];
+        const mapped: Book[] = raw
+          .filter((b: any) => String(b.status).toLowerCase() === 'available')
+          .map((b: any) => ({
+            id: b.book_id || `BK${b.id}`,
+            apiId: Number(b.id),
+            gameId: String(b.game_id),
+            gameName: b.game?.game_name || '',
+            bookName: b.book_name || b.book_id || `BK${b.id}`,
+            agentId: '',
+            agentName: '',
+            tickets: [],
+            bookValue: 0,
+            bookNumber: String(b.id),
+            serialNumber: b.book_id || `SN-${b.id}`,
+            totalTickets: Number(b.game?.book_size || 10),
+            soldTickets: 0,
+            unsoldTickets: 0,
+            assignedDate: '',
+            expiryDate: '',
+            createdDate: b.created_at || '',
+            status: 'Available' as const
+          }));
+        setAvailableBooks(mapped);
+      })
+      .catch(() => setAvailableBooks([]))
+      .finally(() => setLoadingBooks(false));
+  }, [selectedGameId]);
 
   const filteredAvailableBooks = useMemo(() => {
     return availableBooks.filter(b =>
@@ -66,10 +98,6 @@ export const AdminBookAssignment: React.FC = () => {
     }
     if (!selectedAgentId) {
       showToast('Please select an agent.', 'error');
-      return;
-    }
-    if (!expiryDate) {
-      showToast('Please set an expiry date.', 'error');
       return;
     }
 
@@ -156,7 +184,9 @@ export const AdminBookAssignment: React.FC = () => {
                 )}
 
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-[160px] overflow-y-auto space-y-1.5">
-                  {availableBooks.length === 0 ? (
+                  {loadingBooks ? (
+                    <div className="text-center py-6 text-text-secondary text-[11px] italic">Loading books...</div>
+                  ) : availableBooks.length === 0 ? (
                     <div className="text-center py-6 text-text-secondary text-[11px] italic">
                       No available books found. Upload books first!
                     </div>
@@ -222,20 +252,6 @@ export const AdminBookAssignment: React.FC = () => {
               </div>
             )}
 
-            {/* Expiry Date */}
-            <div>
-              <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
-                Assignment Expiry Date
-              </label>
-              <input
-                type="date"
-                required
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white text-text-primary"
-              />
-            </div>
-
             <button
               type="submit"
               disabled={selectedBookIds.length === 0 || !selectedAgentId}
@@ -266,7 +282,6 @@ export const AdminBookAssignment: React.FC = () => {
                     <th className="py-2.5 px-3">Game Name</th>
                     <th className="py-2.5 px-3">Agent</th>
                     <th className="py-2.5 px-3">Agent Type</th>
-                    <th className="py-2.5 px-3">Expiry Date</th>
                     <th className="py-2.5 px-3 text-center">Action</th>
                   </tr>
                 </thead>
@@ -282,7 +297,6 @@ export const AdminBookAssignment: React.FC = () => {
                           {b.id.includes('BK110') ? 'Third Party' : 'First Party'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 font-medium text-rose-600">{b.expiryDate ? new Date(b.expiryDate).toLocaleDateString() : '-'}</td>
                       <td className="py-2.5 px-3 text-center">
                         <button
                           onClick={() => handleRevoke(b.id)}

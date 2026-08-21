@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import {
   Gamepad2,
@@ -30,14 +30,17 @@ import {
 } from 'recharts';
 
 export const AdminDashboard: React.FC = () => {
-  const { games, books, booksTotal, ticketsTotal, agents, winnings } = useAdmin();
-  const navigate = useNavigate();
+  const { games, books, booksTotal, ticketsTotal, agents } = useAdmin();
 
   // Metrics are derived from the API-backed context collections.
   const totalGames = games.length;
   const totalBooks = booksTotal || books.length;
   const totalTickets = ticketsTotal || books.reduce((t, b) => t + b.tickets.length, 0);
   const totalAgents = agents.length;
+
+  const upcomingGames = games.filter(game => game.status === 'Upcoming');
+  const upcomingBooks = upcomingGames.reduce((t, g) => t + (g.totalBooks || 0), 0);
+  const upcomingTickets = upcomingGames.reduce((t, g) => t + (g.totalBooks || 0) * (g.bookSize || 10), 0);
   const totalSalesAmount = books
     .filter(book => book.status === 'Sold')
     .reduce((total, book) => total + (book.bookValue || 0), 0);
@@ -69,14 +72,56 @@ export const AdminDashboard: React.FC = () => {
     { name: 'Available Books', value: availableBooksCount, color: '#3B82F6', percentage: '14%' }
   ];
 
-  // Top Agents Table (Static from reference image)
-  const topAgents = [
-    { name: 'Ramesh Kumar', type: 'First Party', totalBooks: 120, soldBooks: 110, salesAmount: 120000 },
-    { name: 'Suresh Singh', type: 'First Party', totalBooks: 100, soldBooks: 95, salesAmount: 95000 },
-    { name: 'Amit Verma', type: 'Third Party', totalBooks: 80, soldBooks: 70, salesAmount: 70000 },
-    { name: 'Vikash Gupta', type: 'First Party', totalBooks: 90, soldBooks: 65, salesAmount: 65000 },
-    { name: 'Pawan Kumar', type: 'Third Party', totalBooks: 70, soldBooks: 60, salesAmount: 60000 }
-  ];
+  const topAgents = useMemo(() => {
+    const byAgent = new Map<string, {
+      key: string;
+      name: string;
+      type: 'First Party' | 'Third Party';
+      totalBooks: number;
+      soldBooks: number;
+      salesAmount: number;
+    }>();
+
+    agents.forEach(agent => {
+      byAgent.set(agent.id, {
+        key: agent.id,
+        name: agent.name,
+        type: agent.agentType,
+        totalBooks: 0,
+        soldBooks: 0,
+        salesAmount: 0
+      });
+      if (agent.agentId && agent.agentId !== agent.id) {
+        byAgent.set(agent.agentId, byAgent.get(agent.id)!);
+      }
+    });
+
+    books.forEach(book => {
+      if (!book.agentId && !book.agentName) return;
+      const key = book.agentId || book.agentName || 'unknown-agent';
+      const existing = byAgent.get(key) || {
+        key,
+        name: book.agentName || key,
+        type: 'First Party' as const,
+        totalBooks: 0,
+        soldBooks: 0,
+        salesAmount: 0
+      };
+
+      existing.name = existing.name || book.agentName || key;
+      existing.totalBooks += 1;
+      if (book.status === 'Sold') {
+        existing.soldBooks += 1;
+        existing.salesAmount += book.bookValue || 0;
+      }
+      byAgent.set(key, existing);
+    });
+
+    return Array.from(new Set(byAgent.values()))
+      .filter(agent => agent.totalBooks > 0 || agent.salesAmount > 0)
+      .sort((a, b) => b.salesAmount - a.salesAmount || b.soldBooks - a.soldBooks || b.totalBooks - a.totalBooks)
+      .slice(0, 5);
+  }, [agents, books]);
 
   // Recent Games Table (Static from reference image)
   const recentGames = [
@@ -133,6 +178,9 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex flex-col">
               <span className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider">Total Books</span>
               <span className="text-2xl font-bold text-text-primary mt-1">{totalBooks.toLocaleString()}</span>
+              {upcomingBooks > 0 && (
+                <span className="text-[10px] text-amber-600 font-semibold mt-1">{upcomingBooks.toLocaleString()} upcoming</span>
+              )}
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
               <BookOpen className="w-5 h-5" />
@@ -149,6 +197,9 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex flex-col">
               <span className="text-[11px] text-text-secondary font-semibold uppercase tracking-wider">Total Tickets</span>
               <span className="text-2xl font-bold text-text-primary mt-1">{totalTickets.toLocaleString()}</span>
+              {upcomingTickets > 0 && (
+                <span className="text-[10px] text-amber-600 font-semibold mt-1">{upcomingTickets.toLocaleString()} upcoming</span>
+              )}
             </div>
             <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-100">
               <Tag className="w-5 h-5" />
@@ -404,20 +455,28 @@ export const AdminDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-light">
-                {topAgents.map((agent, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3 px-3 font-medium text-text-primary">{agent.name}</td>
-                    <td className="py-3 px-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${agent.type === 'First Party' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                        }`}>
-                        {agent.type}
-                      </span>
+                {topAgents.length > 0 ? (
+                  topAgents.map((agent, idx) => (
+                    <tr key={`${agent.key}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 px-3 font-medium text-text-primary">{agent.name}</td>
+                      <td className="py-3 px-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${agent.type === 'First Party' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}>
+                          {agent.type}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right text-text-secondary font-medium">{agent.totalBooks}</td>
+                      <td className="py-3 px-3 text-right text-text-primary font-medium">{agent.soldBooks}</td>
+                      <td className="py-3 px-3 text-right font-bold text-text-primary">{formatRupee(agent.salesAmount)}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-8 px-3 text-center text-xs font-semibold text-text-secondary">
+                      No agent sales data available yet.
                     </td>
-                    <td className="py-3 px-3 text-right text-text-secondary font-medium">{agent.totalBooks}</td>
-                    <td className="py-3 px-3 text-right text-text-primary font-medium">{agent.soldBooks}</td>
-                    <td className="py-3 px-3 text-right font-bold text-text-primary">{formatRupee(agent.salesAmount)}</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

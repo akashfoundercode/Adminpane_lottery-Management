@@ -1,20 +1,47 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
-import { ArrowLeft, BookOpen, User, Calendar, Tag, ShieldCheck, HelpCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, HelpCircle, CheckCircle2, XCircle } from 'lucide-react';
 
 export const AdminBookDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { books, games, agents, updateBookStatus } = useAdmin();
   const { showToast } = useToast();
-  const [statusToUpdate, setStatusToUpdate] = React.useState<'Sold' | 'Unsold' | null>(null);
-  const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+  const [statusToUpdate, setStatusToUpdate] = useState<'Sold' | 'Unsold' | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [assignmentInfo, setAssignmentInfo] = useState<{ agentName: string; agentId: string; assignedAt: string; expiryAt: string } | null>(null);
 
   const book = books.find(b => b.id === id);
   const game = book ? games.find(g => g.id === book.gameId) : null;
-  const agent = book ? agents.find(a => a.id === book.agentId) : null;
+  const agent = book ? agents.find(a => a.id === book.agentId || a.agentId === book.agentId) : null;
+  const displayAgentName = assignmentInfo?.agentName || agent?.name || book?.agentName || '';
+  const displayAgentId = assignmentInfo?.agentId || agent?.agentId || book?.agentId || '';
+  const displayAssignedDate = assignmentInfo?.assignedAt || book?.assignedDate || '';
+  const displayExpiryDate = assignmentInfo?.expiryAt || book?.expiryDate || '';
+
+  useEffect(() => {
+    if (!book?.agentId) return;
+    const token = localStorage.getItem('admin_token');
+    fetch(`/api/v1/admin/book-assignments/history?limit=100`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(json => {
+        const list: any[] = Array.isArray(json.data) ? json.data : [];
+        const match = list.find((h: any) => String(h.book_id) === String(book.apiId || book.bookNumber));
+        if (match) {
+          setAssignmentInfo({
+            agentName: match.agent?.agent_name || '',
+            agentId: match.agent?.agent_id || '',
+            assignedAt: match.assigned_at || match.created_at || '',
+            expiryAt: match.expiry_at || ''
+          });
+        }
+      })
+      .catch(() => {});
+  }, [book?.agentId, book?.apiId, book?.bookNumber]);
 
   const handleStatusUpdate = async () => {
     if (!book || !statusToUpdate) return;
@@ -168,15 +195,15 @@ export const AdminBookDetails: React.FC = () => {
             Assignment Information
           </h3>
 
-          {book.agentId ? (
+          {(book.agentId || displayAgentName) ? (
             <div className="space-y-4 text-xs">
               <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#6366f1] flex items-center justify-center flex-shrink-0 font-bold border border-indigo-100">
-                  {book.agentName ? book.agentName.slice(0, 2).toUpperCase() : 'AG'}
+                  {displayAgentName ? displayAgentName.slice(0, 2).toUpperCase() : 'AG'}
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-bold text-text-primary">{book.agentName}</span>
-                  <span className="text-[10px] text-text-secondary">{book.agentId}</span>
+                  <span className="font-bold text-text-primary">{displayAgentName || '-'}</span>
+                  <span className="text-[10px] text-text-secondary">{displayAgentId}</span>
                 </div>
               </div>
 
@@ -184,19 +211,19 @@ export const AdminBookDetails: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Assigned Date</span>
                   <span className="font-bold text-text-primary">
-                    {book.assignedDate ? new Date(book.assignedDate).toLocaleDateString() : '-'}
+                    {displayAssignedDate ? new Date(displayAssignedDate).toLocaleDateString() : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Expiry Date</span>
                   <span className="font-bold text-rose-600">
-                    {book.expiryDate ? new Date(book.expiryDate).toLocaleDateString() : '-'}
+                    {displayExpiryDate ? new Date(displayExpiryDate).toLocaleDateString() : '-'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-text-secondary">Expiry Time</span>
                   <span className="font-bold text-rose-600">
-                    {book.expiryDate ? new Date(book.expiryDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                    {displayExpiryDate ? new Date(displayExpiryDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                   </span>
                 </div>
               </div>

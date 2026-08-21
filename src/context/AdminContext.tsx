@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Game, Agent, Book, Winning, Prize, Result, AssignmentHistory, ListPagination } from '../types';
+import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination } from '../types';
 
 interface AdminContextType {
   // Auth
@@ -23,16 +23,22 @@ interface AdminContextType {
   agentsPagination: ListPagination;
   assignmentHistoryPagination: ListPagination;
   resultsPagination: ListPagination;
+  loadingGames: boolean;
+  loadingBooks: boolean;
+  loadingAgents: boolean;
+  loadingHistory: boolean;
+  loadingResults: boolean;
 
   fetchGames: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
   fetchBooks: (limit?: number, page?: number, append?: boolean) => Promise<void>;
   fetchAgents: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
-  fetchAssignmentHistory: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
+  fetchAssignmentHistory: (limit?: number, offset?: number, append?: boolean, gameId?: string) => Promise<void>;
   fetchResults: (limit?: number, offset?: number, append?: boolean) => Promise<void>;
+  fetchResult: (id: string) => Promise<Result | null>;
   createGame: (game: Omit<Game, 'id'>) => Promise<void>;
-  updateGame: (id: string, updatedGame: Partial<Game>) => void;
+  updateGame: (id: string, updatedGame: Partial<Game>) => Promise<void>;
   deleteGame: (id: string) => void;
-  toggleGameStatus: (id: string) => void;
+  toggleGameStatus: (id: string) => Promise<void>;
 
   generateBooks: (gameId: string, count: number, bookSize: number, ticketPrice: number) => { count: number; tickets: number; serialRange: string };
   importBooks: (gameId: string, file: File) => Promise<void>;
@@ -49,11 +55,13 @@ interface AdminContextType {
   deletePrize: (id: string) => void;
   togglePrizeStatus: (id: string) => void;
 
-  createResult: (result: Omit<Result, 'id' | 'gameName' | 'status' | 'publishedDate'>) => Promise<void>;
-  updateResult: (id: string, updatedResult: Partial<Result>) => void;
-  deleteResult: (id: string) => void;
+  createResult: (result: Omit<Result, 'id' | 'gameName' | 'status' | 'publishedDate'>, prizes?: any[]) => Promise<void>;
+  updateResult: (id: string, updatedResult: Partial<Result>, prizes?: any[]) => Promise<void>;
+  deleteResult: (id: string) => Promise<void>;
   publishResult: (id: string) => void;
   unpublishResult: (id: string) => void;
+  toggleResultStatus: (id: string) => Promise<void>;
+  restoreResult: (id: string) => Promise<void>;
 
   updateWinnerClaimStatus: (ticketNumber: string, bookId: string, claimStatus: 'Pending' | 'Claimed' | 'Rejected') => void;
   updateSettings: (settings: any) => void;
@@ -91,10 +99,56 @@ const readPagination = (json: any, itemCount: number, limit: number, offset: num
   };
 };
 
+const toTitle = (value: string) =>
+  value
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, char => char.toUpperCase());
+
+const extractApiErrorMessage = (body: unknown, fallback = 'Something went wrong. Please try again.') => {
+  let parsed = body;
+
+  if (typeof body === 'string') {
+    const trimmed = body.trim();
+    if (!trimmed) return fallback;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return trimmed.length > 180 ? `${trimmed.slice(0, 180)}...` : trimmed;
+    }
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    const data = parsed as any;
+    const errors = data.errors || data.error;
+    if (errors && typeof errors === 'object' && !Array.isArray(errors)) {
+      const firstKey = Object.keys(errors)[0];
+      const firstValue = errors[firstKey];
+      const firstMessage = Array.isArray(firstValue) ? firstValue[0] : firstValue;
+      if (firstMessage) {
+        const fieldName = toTitle(firstKey);
+        return fieldName ? `${fieldName}: ${String(firstMessage)}` : String(firstMessage);
+      }
+    }
+
+    if (Array.isArray(errors) && errors.length > 0) return String(errors[0]);
+    if (data.message) return String(data.message);
+  }
+
+  return fallback;
+};
+
 const appendUnique = <T extends { id: string }>(current: T[], incoming: T[]) => {
   const byId = new Map(current.map(item => [item.id, item]));
   incoming.forEach(item => byId.set(item.id, item));
   return Array.from(byId.values());
+};
+
+const toNumber = (value: any, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 };
 
 // Core Mock Data matching screen statistics
@@ -291,7 +345,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const getFullImageUrl = (path: string | null | undefined): string => {
     if (!path) return 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?w=600';
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      try {
+        const url = new URL(path);
+        const isLocalBackend = ['localhost', '127.0.0.1'].includes(url.hostname);
+        if (isLocalBackend && url.pathname.startsWith('/storage/')) {
+          return url.pathname;
+        }
+      } catch {
+        return path;
+      }
+      return path;
+    }
 
     let cleanPath = path;
     if (cleanPath.startsWith('/')) {
@@ -306,6 +371,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const [games, setGames] = useState<Game[]>([]);
+  const gamesRef = React.useRef<Game[]>([]);
+  useEffect(() => { gamesRef.current = games; }, [games]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [booksTotal, setBooksTotal] = useState(0);
@@ -315,6 +382,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [agentsPagination, setAgentsPagination] = useState<ListPagination>(EMPTY_PAGINATION);
   const [assignmentHistoryPagination, setAssignmentHistoryPagination] = useState<ListPagination>(EMPTY_PAGINATION);
   const [resultsPagination, setResultsPagination] = useState<ListPagination>(EMPTY_PAGINATION);
+  const [loadingGames, setLoadingGames] = useState(false);
+  const [loadingBooks, setLoadingBooks] = useState(false);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingResults, setLoadingResults] = useState(false);
 
   const [winnings, setWinnings] = useState<Winning[]>(() => {
     const stored = localStorage.getItem('lucky_draw_winnings');
@@ -386,6 +458,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const fetchGames = async (limit = 10000, offset = 0, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    setLoadingGames(true);
     try {
       const response = await fetch(`/api/v1/admin/games?limit=${limit}&offset=${offset}`, {
         headers: {
@@ -417,7 +490,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             return {
               id: String(g.id),
-              name: g.game_name || 'Mega Lucky Draw',
+              name: g.game_name || g.game_id || 'Unknown Game',
               gameCode: g.game_id || 'MLD001',
               ticketPrice: Number(g.ticket_price || 100),
               bookSize: Number(g.book_size || 10),
@@ -439,11 +512,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.error('API Error fetching games:', err);
+    } finally {
+      setLoadingGames(false);
     }
   };
 
   const fetchBooks = async (limit = 50, page = 1, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    setLoadingBooks(true);
     try {
       const response = await fetch(`/api/v1/admin/books?page=${page}&limit=${limit}`, {
         headers: {
@@ -470,8 +546,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const hasMore = Boolean(pg.has_more ?? (currentPage < lastPage));
 
         setBooksTotal(total);
-        const perBookTickets = Number(pg.total_tickets ?? rawBooks[0]?.total_tickets ?? 10);
-        setTicketsTotal(Number(pg.total_tickets_count ?? (total * perBookTickets)));
+        const bookSize = Number(rawBooks[0]?.game?.book_size ?? rawBooks[0]?.total_tickets ?? 10);
+        setTicketsTotal(total * bookSize);
         setBooksPagination({
           total,
           perPage: limit,
@@ -492,9 +568,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             else if (apiStatus === 'unsold') mappedStatus = 'Unsold';
             else if (apiStatus === 'unsold by admin') mappedStatus = 'Unsold by Admin';
 
-            const gameName = b.game?.game_name || 'Lucky Draw';
+            const gameName = b.game?.game_name
+              || gamesRef.current.find(g => g.id === String(b.game_id))?.name
+              || b.game?.game_id
+              || 'Unknown Game';
             const bookName = b.book_name || b.name || b.book?.book_name || b.book_id || `BK${b.id}`;
-            const ticketCount = Number(b.total_tickets || 10);
+            const ticketCount = Number(b.game?.book_size || b.total_tickets || 10);
 
             const tickets: string[] = [];
             for (let i = 0; i < ticketCount; i++) {
@@ -507,8 +586,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               gameId: String(b.game_id),
               gameName: gameName,
               bookName: bookName,
-              agentId: b.agent_id ? String(b.agent_id) : (b.agent?.agent_id ? String(b.agent.agent_id) : ''),
-              agentName: b.agent_name || b.agent?.agent_name || '',
+              agentId: b.agent_id ? String(b.agent_id) : '',
+              agentName: b.agent?.agent_name || b.agent_name || '',
               tickets: tickets,
               bookValue: ticketCount * 100,
               bookNumber: String(b.id),
@@ -516,8 +595,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               totalTickets: ticketCount,
               soldTickets: b.sold_tickets || 0,
               unsoldTickets: b.unsold_tickets || 0,
-              assignedDate: b.assigned_date || '',
-              expiryDate: b.expiry_date || '',
+              assignedDate: b.assigned_at || '',
+              expiryDate: b.expiry_at || '',
               createdDate: b.created_at || new Date().toISOString(),
               soldDate: b.sold_at || b.sold_date || '',
               unsoldDate: b.unsold_at || b.unsold_date || '',
@@ -530,11 +609,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.error('API Error fetching books:', err);
+    } finally {
+      setLoadingBooks(false);
     }
   };
 
   const fetchAgents = async (limit = 10000, offset = 0, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    setLoadingAgents(true);
     try {
       const response = await fetch(`/api/v1/admin/agents?limit=${limit}&offset=${offset}`, {
         headers: {
@@ -576,13 +658,17 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.error('API Error fetching agents:', err);
+    } finally {
+      setLoadingAgents(false);
     }
   };
 
-  const fetchAssignmentHistory = async (limit = 10000, offset = 0, append = false) => {
+  const fetchAssignmentHistory = async (limit = 10000, offset = 0, append = false, gameId?: string) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    setLoadingHistory(true);
     try {
-      const response = await fetch(`/api/v1/admin/book-assignments/history?limit=${limit}&offset=${offset}`, {
+      const gameParam = gameId ? `&game_id=${gameId}` : '';
+      const response = await fetch(`/api/v1/admin/book-assignments/history?limit=${limit}&offset=${offset}${gameParam}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -604,7 +690,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const mappedHistory: AssignmentHistory[] = rawHistory.map((h: any) => {
             const bookCode = h.book?.book_id || h.book_id || String(h.book_id || '');
             const bookName = h.book?.book_name || h.book?.name || h.book_name || bookCode;
-            const gameName = h.game?.game_name || h.book?.game?.game_name || 'Mega Lucky Draw';
+            const gameName = h.game?.game_name
+              || h.book?.game?.game_name
+              || gamesRef.current.find(g => g.id === String(h.game_id || h.book?.game_id))?.name
+              || h.game?.game_id
+              || h.book?.game?.game_id
+              || 'Unknown Game';
             const agentName = h.agent?.agent_name || h.agent_name || 'Agent User';
             const agentId = h.agent?.agent_id || h.agent_id || '';
             const agentType = (h.agent?.agent_type || h.agent_type) === 'first_party' ? 'First Party' : 'Third Party';
@@ -625,8 +716,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               agentName: agentName,
               agentId: String(agentId),
               agentType: agentType as any,
-              assignedDate: h.assigned_date || h.created_at || new Date().toISOString(),
-              expiryDate: h.expiry_date || '',
+              assignedDate: h.assigned_at || h.assigned_date || h.created_at || '',
+              expiryDate: h.expiry_at || h.expiry_date || '',
               status: mappedStatus
             };
           });
@@ -636,52 +727,139 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.error('API Error fetching assignment history:', err);
+    } finally {
+      setLoadingHistory(false);
     }
+  };
+
+  const getRawResultPrizes = (result: any): any[] => {
+    if (result.book_winner_prizes || result.ticket_winner_prizes) {
+      return [];
+    }
+    return result.prizes || result.result_prizes || result.resultPrizes || [];
+  };
+
+  const normalizePrizeType = (value: any): ResultPrize['prize_type'] => {
+    const type = String(value || '').toLowerCase();
+    if (type === 'book_winner' || type === 'book' || type === 'book_winner_prize') return 'book_winner';
+    if (type === 'ticket_winner' || type === 'ticket' || type === 'ticket_winner_prize') return 'ticket_winner';
+    return undefined;
+  };
+
+  const getPrizeImagePath = (p: any): string | undefined =>
+    p.prize_image_url
+    || p.prize_image
+    || p.prize_image_path
+    || p.image_url
+    || p.image_path
+    || p.image
+    || p.media?.url
+    || p.file?.url;
+
+  const mapResultPrizes = (raw: any[] = []): ResultPrize[] =>
+    raw
+      .filter(Boolean)
+      .map((p: any, index: number) => {
+        const prizeType = normalizePrizeType(p.prize_type ?? p.type ?? p.winner_type);
+        return {
+          id: p.id !== undefined && p.id !== null ? String(p.id) : undefined,
+          rank: toNumber(p.rank ?? p.position ?? index + 1, index + 1),
+          prize_type: prizeType,
+          prize_name: p.prize_name || p.name || p.title || p.book_prize_name || p.ticket_prize_name || '',
+          book_prize_name: p.book_prize_name,
+          ticket_prize_name: p.ticket_prize_name,
+          book_prize_amount: prizeType === 'book_winner' ? toNumber(p.prize_amount ?? p.book_prize_amount) : toNumber(p.book_prize_amount),
+          ticket_prize_amount: prizeType === 'ticket_winner' ? toNumber(p.prize_amount ?? p.ticket_prize_amount) : toNumber(p.ticket_prize_amount),
+          prize_image: getPrizeImagePath(p) ? getFullImageUrl(getPrizeImagePath(p)) : undefined,
+          total_books_sold: toNumber(p.total_books_sold ?? p.books_sold),
+          total_tickets: toNumber(p.total_tickets ?? p.tickets_count),
+          book_price: toNumber(p.book_price),
+          ticket_price: toNumber(p.ticket_price),
+        };
+      });
+
+  const mapResult = (r: any): Result => ({
+    id: String(r.id),
+    gameId: String(r.game_id ?? r.game?.id ?? ''),
+    gameName: r.game?.game_name || r.game_name || r.game?.name || r.title || 'Lucky Draw Result',
+    drawDate: r.result_date || r.draw_date || r.date || '',
+    image: getFullImageUrl(r.result_image || r.image),
+    title: r.title || '',
+    status: r.status === 'active' || r.status === 'published' ? 'Published' : 'Draft',
+    publishedDate: r.created_at || '',
+    updatedAt: r.updated_at || '',
+    deletedAt: r.deleted_at || undefined,
+    prizes: (() => {
+      const raw: any[] = r.book_winner_prizes || r.ticket_winner_prizes
+        ? [
+            ...(r.book_winner_prizes || []).map((p: any) => ({ ...p, prize_type: 'book_winner' })),
+            ...(r.ticket_winner_prizes || []).map((p: any) => ({ ...p, prize_type: 'ticket_winner' }))
+          ]
+        : getRawResultPrizes(r);
+      return mapResultPrizes(raw);
+    })(),
+  });
+
+  const getResultPayload = (json: any): any => {
+    if (json?.data?.data && !Array.isArray(json.data.data)) return json.data.data;
+    if (json?.data && !Array.isArray(json.data)) return json.data;
+    return json;
   };
 
   const fetchResults = async (limit = 10000, offset = 0, append = false) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    setLoadingResults(true);
     try {
       const response = await fetch(`/api/v1/admin/results?limit=${limit}&offset=${offset}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
         const json = await response.json();
         let rawResults: any[] = [];
-
-        if (json.success && json.data) {
-          if (Array.isArray(json.data.data)) {
-            rawResults = json.data.data;
-          } else if (Array.isArray(json.data)) {
-            rawResults = json.data;
-          }
+        if ((json.success ?? true) && json.data) {
+          if (Array.isArray(json.data.data)) rawResults = json.data.data;
+          else if (Array.isArray(json.data)) rawResults = json.data;
+          else if (Array.isArray(json.data.results)) rawResults = json.data.results;
+        } else if (Array.isArray(json.results)) {
+          rawResults = json.results;
+        } else if (Array.isArray(json)) {
+          rawResults = json;
         }
-
-        if (json.success) {
-          const mappedResults: Result[] = rawResults.map((r: any) => {
-            const gameName = r.game?.game_name || r.title || 'Lucky Draw Result';
-            const statusVal = r.status === 'draft' ? 'Draft' : 'Published';
-            return {
-              id: String(r.id),
-              gameId: String(r.game_id),
-              gameName: gameName,
-              drawDate: r.result_date || '',
-              image: getFullImageUrl(r.result_image),
-              title: r.title || '',
-              status: statusVal,
-              publishedDate: r.created_at || ''
-            };
-          });
+        if (json.success ?? true) {
+          const mappedResults: Result[] = rawResults.map(mapResult);
           setResults(prev => append ? appendUnique(prev, mappedResults) : mappedResults);
           setResultsPagination(readPagination(json, mappedResults.length, limit, offset));
         }
       }
     } catch (err) {
       console.error('API Error fetching results:', err);
+    } finally {
+      setLoadingResults(false);
     }
+  };
+
+  const fetchResult = async (id: string): Promise<Result | null> => {
+    const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    const response = await fetch(`/api/v1/admin/results/${id}`, {
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+
+    let json: any = null;
+    try {
+      json = await response.json();
+    } catch {
+      // Empty API responses are handled by the ok check below.
+    }
+
+    if (!response.ok || json?.success === false) {
+      throw new Error(json?.message || 'Failed to fetch result details.');
+    }
+
+    const rawResult = getResultPayload(json);
+    if (!rawResult || Array.isArray(rawResult)) return null;
+    const mapped = mapResult(rawResult);
+    setResults(prev => appendUnique(prev, [mapped]));
+    return mapped;
   };
 
   // Fetch games, books, agents, assignment history and results automatically when admin becomes authenticated
@@ -839,24 +1017,94 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const updateGame = (id: string, updatedGame: Partial<Game>) => {
-    setGames(prev => prev.map(g => g.id === id ? { ...g, ...updatedGame } : g));
+  const updateGame = async (id: string, updatedGame: Partial<Game>): Promise<void> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const apiStatus = updatedGame.status === 'Live' ? 'active' : updatedGame.status === 'Completed' ? 'completed' : 'inactive';
+
+    let formattedTime = updatedGame.drawTime;
+    if (formattedTime && formattedTime.split(':').length === 2) formattedTime += ':00';
+
+    try {
+      if (updatedGame.imageFile) {
+        const formData = new FormData();
+        if (updatedGame.name) formData.append('game_name', updatedGame.name);
+        if (updatedGame.gameCode) formData.append('game_id', updatedGame.gameCode);
+        formData.append('game_image', updatedGame.imageFile);
+        if (updatedGame.ticketPrice) formData.append('ticket_price', String(updatedGame.ticketPrice));
+        if (updatedGame.bookSize) formData.append('book_size', String(updatedGame.bookSize));
+        if (updatedGame.drawDate) formData.append('draw_date', updatedGame.drawDate);
+        formData.append('draw_time', formattedTime || '18:00:00');
+        if (updatedGame.youtubeLiveUrl) formData.append('youtube_live_url', updatedGame.youtubeLiveUrl);
+        if (updatedGame.facebookLiveUrl) formData.append('facebook_live_url', updatedGame.facebookLiveUrl);
+        if (updatedGame.status) formData.append('status', apiStatus);
+        formData.append('_method', 'PUT');
+
+        const res = await fetch(`/api/v1/admin/games/${id}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          try { const j = JSON.parse(t); throw new Error(j.message || t || 'Update failed.'); } catch { throw new Error(t || 'Update failed.'); }
+        }
+      } else {
+        const payload: any = { draw_time: formattedTime || '18:00:00' };
+        if (updatedGame.name !== undefined) payload.game_name = updatedGame.name;
+        if (updatedGame.gameCode !== undefined) payload.game_id = updatedGame.gameCode;
+        if (updatedGame.ticketPrice !== undefined) payload.ticket_price = Number(updatedGame.ticketPrice);
+        if (updatedGame.bookSize !== undefined) payload.book_size = Number(updatedGame.bookSize);
+        if (updatedGame.drawDate !== undefined) payload.draw_date = updatedGame.drawDate;
+        if (updatedGame.youtubeLiveUrl !== undefined) payload.youtube_live_url = updatedGame.youtubeLiveUrl;
+        if (updatedGame.facebookLiveUrl !== undefined) payload.facebook_live_url = updatedGame.facebookLiveUrl;
+        if (updatedGame.status !== undefined) payload.status = apiStatus;
+
+        const res = await fetch(`/api/v1/admin/games/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          try { const j = JSON.parse(t); throw new Error(j.message || t || 'Update failed.'); } catch { throw new Error(t || 'Update failed.'); }
+        }
+      }
+      await fetchGames();
+    } catch (err: any) {
+      throw new Error(err.message || 'API connection failed.');
+    }
   };
 
   const deleteGame = (id: string) => {
     setGames(prev => prev.filter(g => g.id !== id));
   };
 
-  const toggleGameStatus = (id: string) => {
-    setGames(prev => prev.map(g => {
-      if (g.id === id) {
-        const statuses: Game['status'][] = ['Upcoming', 'Live', 'Completed', 'Cancelled'];
-        const currIndex = statuses.indexOf(g.status);
-        const nextIndex = (currIndex + 1) % statuses.length;
-        return { ...g, status: statuses[nextIndex] };
-      }
-      return g;
-    }));
+  const toggleGameStatus = async (id: string) => {
+    const game = games.find(g => g.id === id);
+    if (!game) throw new Error('Game not found.');
+
+    const nextStatus: Game['status'] = game.status === 'Live' ? 'Upcoming' : 'Live';
+
+    setGames(prev => prev.map(g => g.id === id ? { ...g, status: nextStatus } : g));
+
+    try {
+      await updateGame(id, {
+        name: game.name,
+        gameCode: game.gameCode,
+        ticketPrice: game.ticketPrice,
+        bookSize: game.bookSize,
+        drawDate: game.drawDate,
+        drawTime: game.drawTime,
+        startDate: game.startDate,
+        endDate: game.endDate,
+        status: nextStatus,
+        youtubeLiveUrl: game.youtubeLiveUrl,
+        facebookLiveUrl: game.facebookLiveUrl
+      });
+    } catch (err) {
+      setGames(prev => prev.map(g => g.id === id ? { ...g, status: game.status } : g));
+      throw err;
+    }
   };
 
   // Book Generation
@@ -1151,59 +1399,130 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setPrizes(prev => prev.map(p => p.id === id ? { ...p, status: p.status === 'Active' ? 'Inactive' : 'Active' } : p));
   };
 
-  const createResult = async (resultData: Omit<Result, 'id' | 'gameName' | 'status' | 'publishedDate'>) => {
-    const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+  const buildResultFormData = (resultData: Partial<Result>, prizes: any[] = [], includeFallbackImage = false) => {
     const formData = new FormData();
 
-    // Find numeric game database ID
     const gameObj = games.find(g => g.id === resultData.gameId);
-    const numericGameId = gameObj ? Number(gameObj.id) : Number(resultData.gameId);
+    const gameId = toNumber(gameObj?.id ?? resultData.gameId, 0);
 
-    formData.append('game_id', String(numericGameId));
-    formData.append('result_date', resultData.drawDate);
-    formData.append('title', resultData.title || 'Daily Lottery Result');
+    if (gameId > 0) formData.append('game_id', String(gameId));
+    if (resultData.drawDate) formData.append('result_date', resultData.drawDate);
+    if (resultData.title !== undefined) formData.append('title', resultData.title || 'Daily Lottery Result');
 
     if (resultData.imageFile) {
       formData.append('result_image', resultData.imageFile);
-    } else {
-      // Create a mock image if not provided (required field by API validation)
+    } else if (includeFallbackImage) {
       const blob = new Blob(['mock_image_content'], { type: 'image/png' });
-      const dummyFile = new File([blob], 'result_board.png', { type: 'image/png' });
-      formData.append('result_image', dummyFile);
+      formData.append('result_image', new File([blob], 'result_board.png', { type: 'image/png' }));
+    } else if (resultData.image) {
+      formData.append('existing_result_image', resultData.image);
     }
+
+    const appendPrize = (p: any, index: number, prizeType: 'book_winner' | 'ticket_winner') => {
+      formData.append(`prizes[${index}][rank]`, String(toNumber(p.rank, index + 1)));
+      formData.append(`prizes[${index}][prize_name]`, String(p.prize_name || p.book_prize_name || p.ticket_prize_name || `${toNumber(p.rank, index + 1)} Prize`));
+      formData.append(`prizes[${index}][prize_type]`, prizeType);
+      formData.append(
+        `prizes[${index}][prize_amount]`,
+        String(prizeType === 'book_winner' ? toNumber(p.book_prize_amount ?? p.prize_amount) : toNumber(p.ticket_prize_amount ?? p.prize_amount))
+      );
+      if (p.prize_image instanceof File) {
+        formData.append(`prizes[${index}][prize_image]`, p.prize_image);
+      }
+      // No image field appended when no new file — backend preserves existing image
+    };
+
+    let prizeIndex = 0;
+    prizes
+      .filter(p => p && (p.prize_name || p.book_prize_name || p.ticket_prize_name || toNumber(p.book_prize_amount) > 0 || toNumber(p.ticket_prize_amount) > 0 || toNumber(p.prize_amount) > 0 || p.prize_image instanceof File))
+      .forEach((p, i) => {
+        const typedPrizeType = normalizePrizeType(p.prize_type ?? p.type ?? p.winner_type);
+        if (typedPrizeType) {
+          appendPrize(p, prizeIndex, typedPrizeType);
+          prizeIndex += 1;
+          return;
+        }
+
+        appendPrize({ ...p, prize_name: p.book_prize_name || p.prize_name, rank: p.rank ?? i + 1 }, prizeIndex, 'book_winner');
+        prizeIndex += 1;
+        appendPrize({ ...p, prize_name: p.ticket_prize_name || p.prize_name, rank: p.rank ?? i + 1 }, prizeIndex, 'ticket_winner');
+        prizeIndex += 1;
+      });
+
+    return formData;
+  };
+
+  const createResult = async (resultData: Omit<Result, 'id' | 'gameName' | 'status' | 'publishedDate'>, prizes: any[] = []) => {
+    const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    const formData = buildResultFormData(resultData, prizes, false);
 
     try {
       const response = await fetch('/api/v1/admin/results', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-
       if (!response.ok) {
         const errorText = await response.text();
-        let errMsg = 'Failed to store result on server.';
-        try {
-          const parsed = JSON.parse(errorText);
-          if (parsed.message) errMsg = parsed.message;
-        } catch (e) { }
-        throw new Error(errMsg);
+        throw new Error(extractApiErrorMessage(errorText, 'Failed to store result on server.'));
       }
-
       await fetchResults();
     } catch (err: any) {
       console.error('API Error in createResult:', err);
-      throw new Error(err.message || 'API connection failed. Please check if server is running.');
+      throw new Error(extractApiErrorMessage(err.message, 'API connection failed.'));
     }
   };
 
-  const updateResult = (id: string, updatedResult: Partial<Result>) => {
-    setResults(prev => prev.map(r => r.id === id ? { ...r, ...updatedResult } : r));
+  const updateResult = async (id: string, updatedResult: Partial<Result>, prizes: any[] = []) => {
+    const token = localStorage.getItem('admin_token') || '';
+    const formData = buildResultFormData(updatedResult, prizes, false);
+    formData.append('_method', 'PUT');
+    try {
+      const response = await fetch(`/api/v1/admin/results/${id}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      const responseText = await response.text();
+      let json: any = null;
+      try {
+        json = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        // Successful update endpoints may return an empty or non-JSON body.
+      }
+
+      if (!response.ok || json?.success === false) {
+        throw new Error(extractApiErrorMessage(json || responseText, 'Failed to update result.'));
+      }
+
+      if (json) {
+        const rawResult = getResultPayload(json);
+        if (rawResult && !Array.isArray(rawResult)) {
+          setResults(prev => appendUnique(prev, [mapResult(rawResult)]));
+          return;
+        }
+      }
+      await fetchResults();
+    } catch (err: any) {
+      console.error('API Error in updateResult:', err);
+      throw new Error(extractApiErrorMessage(err.message, 'Update failed.'));
+    }
   };
 
-  const deleteResult = (id: string) => {
-    setResults(prev => prev.filter(r => r.id !== id));
+  const deleteResult = async (id: string) => {
+    const token = localStorage.getItem('admin_token') || '';
+    try {
+      const res = await fetch(`/api/v1/admin/results/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Delete failed.');
+      await fetchResults();
+    } catch (err) {
+      console.error('API Error in deleteResult:', err);
+      throw err;
+    }
   };
 
   const publishResult = (id: string) => {
@@ -1212,6 +1531,36 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const unpublishResult = (id: string) => {
     setResults(prev => prev.map(r => r.id === id ? { ...r, status: 'Draft', publishedDate: undefined } : r));
+  };
+
+  const toggleResultStatus = async (id: string) => {
+    const token = localStorage.getItem('admin_token') || '';
+    try {
+      const res = await fetch(`/api/v1/admin/results/${id}/toggle-status`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Toggle failed.');
+      await fetchResults();
+    } catch (err: any) {
+      console.error('API Error in toggleResultStatus:', err);
+      throw new Error(err.message || 'Toggle failed.');
+    }
+  };
+
+  const restoreResult = async (id: string) => {
+    const token = localStorage.getItem('admin_token') || '';
+    try {
+      const res = await fetch(`/api/v1/admin/results/${id}/restore`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Restore failed.');
+      await fetchResults();
+    } catch (err: any) {
+      console.error('API Error in restoreResult:', err);
+      throw new Error(err.message || 'Restore failed.');
+    }
   };
 
   // Winners claim status
@@ -1265,6 +1614,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fetchAgents,
       fetchAssignmentHistory,
       fetchResults,
+      fetchResult,
+      loadingGames,
+      loadingBooks,
+      loadingAgents,
+      loadingHistory,
+      loadingResults,
       createGame,
       updateGame,
       deleteGame,
@@ -1286,6 +1641,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       deleteResult,
       publishResult,
       unpublishResult,
+      toggleResultStatus,
+      restoreResult,
       updateWinnerClaimStatus,
       updateSettings,
       resetSystem

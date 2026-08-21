@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { Search, Plus, Edit, UserCheck, UserX, Eye, AlertCircle, Mail, Phone, MapPin } from 'lucide-react';
+import { PageLoader } from '../../components/PageLoader';
 
 export const AdminAgentsFirstParty: React.FC = () => {
-  const { agents, agentsPagination, createAgent, updateAgent, toggleAgentStatus, fetchAgents } = useAdmin();
+  const { agents, agentsPagination, createAgent, updateAgent, toggleAgentStatus, fetchAgents, loadingAgents } = useAdmin();
   const { showToast } = useToast();
 
   React.useEffect(() => {
@@ -141,7 +142,7 @@ export const AdminAgentsFirstParty: React.FC = () => {
 
       {/* AGENTS LIST */}
       <div className="bg-white rounded-xl border border-border-light shadow-sm overflow-hidden">
-        {filteredAgents.length === 0 ? (
+        {loadingAgents ? <PageLoader /> : filteredAgents.length === 0 ? (
           <div className="p-8 text-center flex flex-col items-center">
             <AlertCircle className="w-10 h-10 text-slate-300 mb-2" />
             <p className="text-xs font-semibold text-text-primary">No First Party agents found</p>

@@ -8,6 +8,33 @@ interface AdminUploadResultProps {
   onUploaded?: () => void | Promise<void>;
 }
 
+const formatErrorMessage = (error: unknown, fallback: string) => {
+  const raw = error instanceof Error ? error.message : String(error || '');
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw);
+    const errors = parsed.errors || parsed.error;
+    if (errors && typeof errors === 'object' && !Array.isArray(errors)) {
+      const firstKey = Object.keys(errors)[0];
+      const firstValue = errors[firstKey];
+      const firstMessage = Array.isArray(firstValue) ? firstValue[0] : firstValue;
+      if (firstMessage) {
+        const field = firstKey
+          .replace(/\[[^\]]*\]/g, '')
+          .replace(/_/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .replace(/\b\w/g, char => char.toUpperCase());
+        return field ? `${field}: ${firstMessage}` : String(firstMessage);
+      }
+    }
+    return parsed.message || fallback;
+  } catch {
+    return raw.length > 180 ? `${raw.slice(0, 180)}...` : raw;
+  }
+};
+
 export const AdminUploadResult: React.FC<AdminUploadResultProps> = ({ onUploaded }) => {
   const { games, createResult, publishResult, results } = useAdmin();
   const { showToast } = useToast();
@@ -79,7 +106,7 @@ export const AdminUploadResult: React.FC<AdminUploadResultProps> = ({ onUploaded
         navigate('/admin/results');
       }
     } catch (err: any) {
-      showToast(err.message || 'Failed to upload result.', 'error');
+      showToast(formatErrorMessage(err, 'Failed to upload result.'), 'error');
     } finally {
       setIsSaving(false);
     }

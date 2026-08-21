@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Sparkles, ArrowLeft, CheckCircle, HelpCircle } from 'lucide-react';
+import { Sparkles, ArrowLeft, CheckCircle, HelpCircle, AlertCircle, Loader2, Download } from 'lucide-react';
 // @ts-ignore
 import * as XLSX from 'xlsx';
 
@@ -22,6 +22,9 @@ export const AdminGenerateBooks: React.FC<AdminGenerateBooksProps> = ({ onUpload
   // File import state
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importFileName, setImportFileName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [expandedErrors, setExpandedErrors] = useState<Set<number>>(new Set());
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,31 +129,42 @@ export const AdminGenerateBooks: React.FC<AdminGenerateBooksProps> = ({ onUpload
 
   const handleImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedGameId) {
-      showToast('Please select a game first.', 'error');
-      return;
-    }
-    if (!importFile) {
-      showToast('Please upload a spreadsheet file.', 'error');
-      return;
-    }
-
+    if (!selectedGameId) { showToast('Please select a game first.', 'error'); return; }
+    if (!importFile) { showToast('Please upload a spreadsheet file.', 'error'); return; }
+    setErrors([]);
+    setUploading(true);
     try {
-      showToast('Parsing and normalizing spreadsheet columns...', 'info');
       const normalizedFile = await processFileAndNormalize(importFile);
-
-      showToast('Uploading normalized spreadsheet to API...', 'info');
       await importBooks(selectedGameId, normalizedFile);
-
-      showToast('Books and tickets generated successfully via spreadsheet!', 'success');
-      if (onUploaded) {
-        await onUploaded();
-      } else {
-        navigate('/admin/books');
-      }
+      showToast('Books uploaded successfully!', 'success');
+      if (onUploaded) await onUploaded();
+      else navigate('/admin/books');
     } catch (err: any) {
-      showToast(err.message || 'Spreadsheet import failed.', 'error');
+      const msg: string = err.message || 'Spreadsheet import failed.';
+      // Parse multiple errors — split by newline or sentence
+      const lines = msg.split(/\n|(?<=\.)\.?\s+(?=[A-Z(])/).map((s: string) => s.trim()).filter(Boolean);
+      setErrors(lines.length > 1 ? lines : [msg]);
+    } finally {
+      setUploading(false);
     }
+  };
+
+  const downloadSampleCSV = () => {
+    const ticketsPerBook = 10;
+    const rows = [['SL NO', 'BOOK NO', 'ticket_no']];
+    for (let b = 1; b <= 10; b++) {
+      const bookNo = String(100000 + b);
+      const tickets = Array.from({ length: ticketsPerBook }, (_, i) => String(100000 + (b - 1) * ticketsPerBook + i + 1)).join(', ');
+      rows.push([String(b), bookNo, tickets]);
+    }
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample_books.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Sync game ID from query param if any
@@ -230,21 +244,65 @@ export const AdminGenerateBooks: React.FC<AdminGenerateBooksProps> = ({ onUpload
               </div>
             </div>
 
+            {/* Error List */}
+            {errors.length > 0 && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 space-y-1.5">
+                {errors.map((err, i) => {
+                  const LIMIT = 80;
+                  const isLong = err.length > LIMIT;
+                  const expanded = expandedErrors.has(i);
+                  const displayed = isLong && !expanded ? err.slice(0, LIMIT) + '…' : err;
+                  return (
+                    <div key={i} className="flex items-start gap-2 text-[11px] text-rose-700">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>
+                        {displayed}
+                        {isLong && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedErrors(prev => {
+                              const next = new Set(prev);
+                              expanded ? next.delete(i) : next.add(i);
+                              return next;
+                            })}
+                            className="ml-1 underline font-semibold text-rose-600 hover:text-rose-800"
+                          >
+                            {expanded ? 'View less' : 'View more'}
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <button
               type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+              disabled={uploading}
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>Upload Books</span>
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              <span>{uploading ? 'Uploading...' : 'Upload Books'}</span>
             </button>
           </form>
         </div>
 
         {/* INSTRUCTIONS PANEL */}
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 lg:col-span-5 space-y-4">
-          <h3 className="font-display font-semibold text-text-primary text-xs uppercase tracking-wider border-b border-slate-200 pb-2">
-            Import Instructions
-          </h3>
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 className="font-display font-semibold text-text-primary text-xs uppercase tracking-wider">
+              Import Instructions
+            </h3>
+            <button
+              type="button"
+              onClick={downloadSampleCSV}
+              className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg px-2.5 py-1.5 transition-colors"
+            >
+              <Download className="w-3 h-3" />
+              Sample CSV
+            </button>
+          </div>
           <div className="space-y-4 text-xs text-text-secondary leading-relaxed">
             <p>
               Please upload a spreadsheet file containing the books and ticket numbers to generate them on the backend database.
@@ -254,11 +312,26 @@ export const AdminGenerateBooks: React.FC<AdminGenerateBooksProps> = ({ onUpload
               <span className="font-bold text-[10px] text-text-primary uppercase tracking-wider block">
                 Required Sheet Columns:
               </span>
-              <ul className="list-disc pl-4 space-y-1 text-[11px]">
-                <li><strong className="text-text-primary">book_id</strong> - Unique book identifier (e.g., BK001)</li>
-                <li><strong className="text-text-primary">ticket_numbers</strong> - Ticket numbers/serials contained in the book</li>
-                <li><strong className="text-text-primary">total_tickets</strong> - Number of tickets in the book</li>
-              </ul>
+              <table className="w-full text-[10px] border-collapse">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="border border-slate-200 px-2 py-1 text-center font-semibold text-text-primary">SL NO</th>
+                    <th className="border border-slate-200 px-2 py-1 text-center font-semibold text-text-primary">BOOK NO</th>
+                    <th className="border border-slate-200 px-2 py-1 text-center font-semibold text-text-primary">ticket_no</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[1, 2].map(b => (
+                    <tr key={b}>
+                      <td className="border border-slate-200 px-2 py-1 text-center text-text-secondary">{b}</td>
+                      <td className="border border-slate-200 px-2 py-1 text-center text-text-secondary">{100000 + b}</td>
+                      <td className="border border-slate-200 px-2 py-1 text-center text-text-secondary">
+                        {Array.from({ length: 10 }, (_, i) => 100000 + (b - 1) * 10 + i + 1).join(', ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-[10px] text-indigo-800 flex gap-2">

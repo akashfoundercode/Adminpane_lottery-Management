@@ -133,7 +133,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </div>
 
         {/* SIDEBAR NAVIGATION ITEMS */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-thin">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 no-scrollbar">
           {menuItems.map((item, idx) => {
             const active = isActive(item.path);
             const Icon = item.icon;
@@ -214,7 +214,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 </button>
               </div>
 
-              <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+              <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1 no-scrollbar">
                 {menuItems.map((item, idx) => {
                   const active = isActive(item.path);
                   const Icon = item.icon;

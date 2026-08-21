@@ -1,18 +1,76 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
-import { ArrowLeft, Calendar, Tag, Layers, PlayCircle, BookOpen, AlertCircle, ShoppingCart, UserCheck, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Layers, AlertCircle, Trash2 } from 'lucide-react';
+import type { Book } from '../../types';
 
 export const AdminGameDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { games, books, deleteGame } = useAdmin();
+  const { games, deleteGame } = useAdmin();
   const navigate = useNavigate();
 
   const game = games.find(g => g.id === id);
 
+  const [gameBooks, setGameBooks] = useState<Book[]>([]);
+  const [booksLoading, setBooksLoading] = useState(false);
+  const [booksPagination, setBooksPagination] = useState({ total: 0, currentPage: 1, lastPage: 1 });
+
+  const fetchGameBooks = async (page = 1) => {
+    if (!game) return;
+    setBooksLoading(true);
+    const token = localStorage.getItem('admin_token') || '';
+    try {
+      const res = await fetch(`/api/v1/admin/books?page=${page}&limit=50&game_id=${game.id}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      const json = await res.json();
+      if (json.success) {
+        const bookSize = Number(json.data[0]?.game?.book_size || game.bookSize || 10);
+        const mapped: Book[] = (json.data || []).map((b: any) => ({
+          id: b.book_id || `BK${b.id}`,
+          apiId: Number(b.id),
+          gameId: String(b.game_id),
+          gameName: b.game?.game_name || game.name,
+          bookName: b.book_id || `BK${b.id}`,
+          agentId: b.agent_id ? String(b.agent_id) : '',
+          agentName: b.agent?.agent_name || '',
+          tickets: Array.from({ length: bookSize }, (_, i) => String(50000 + b.id * bookSize + i)),
+          bookValue: bookSize * Number(b.game?.ticket_price || game.ticketPrice || 100),
+          bookNumber: String(b.id),
+          serialNumber: `SN-${b.book_id || b.id}`,
+          totalTickets: bookSize,
+          soldTickets: 0,
+          unsoldTickets: 0,
+          assignedDate: b.assigned_at || '',
+          expiryDate: b.expiry_at || '',
+          createdDate: b.created_at || '',
+          status: (() => {
+            const s = String(b.status).toLowerCase();
+            if (s === 'assigned') return 'Assigned';
+            if (s === 'sold') return 'Sold';
+            if (s === 'unsold') return 'Unsold';
+            if (s === 'unsold by admin') return 'Unsold by Admin';
+            if (s === 'in progress') return 'In Progress';
+            return 'Available';
+          })() as Book['status']
+        }));
+        setGameBooks(page === 1 ? mapped : prev => [...prev, ...mapped]);
+        const pg = json.pagination || {};
+        setBooksPagination({ total: pg.total || 0, currentPage: pg.current_page || page, lastPage: pg.last_page || 1 });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setBooksLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (game) fetchGameBooks(1);
+  }, [id, games.length]);
+
   // Derived stats
-  const gameBooks = books.filter(b => b.gameId === id);
-  const totalBooks = gameBooks.length;
+  const totalBooks = booksPagination.total || gameBooks.length;
   const soldBooks = gameBooks.filter(b => b.status === 'Sold').length;
   const unsoldBooks = gameBooks.filter(b => b.status === 'Unsold').length;
   const expiredBooks = gameBooks.filter(b => b.status === 'Unsold by Admin').length;
@@ -151,10 +209,12 @@ export const AdminGameDetails: React.FC = () => {
         {/* RIGHT COLUMN: GENERATED BOOKS SUBTABLE */}
         <div className="premium-card p-5 bg-white border border-border-light lg:col-span-2 flex flex-col">
           <h3 className="font-display font-semibold text-text-primary text-xs uppercase tracking-wider border-b border-border-light pb-2 mb-4">
-            Generated Books ({gameBooks.length})
+            Generated Books ({totalBooks})
           </h3>
           <div className="flex-1 overflow-y-auto max-h-[400px]">
-            {gameBooks.length === 0 ? (
+            {booksLoading && gameBooks.length === 0 ? (
+              <div className="p-8 text-center text-text-secondary text-xs">Loading books...</div>
+            ) : gameBooks.length === 0 ? (
               <div className="p-8 text-center text-text-secondary text-xs">
                 No books uploaded for this game yet. Upload books using the button on the left.
               </div>
@@ -169,7 +229,7 @@ export const AdminGameDetails: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-light">
-                  {gameBooks.slice(0, 50).map(b => (
+                  {gameBooks.map(b => (
                     <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-2 px-3 font-semibold text-text-primary">
                         <Link to={`/admin/books/${b.id}`} className="text-indigo-600 hover:underline">
@@ -193,6 +253,15 @@ export const AdminGameDetails: React.FC = () => {
               </table>
             )}
           </div>
+          {booksPagination.currentPage < booksPagination.lastPage && (
+            <button
+              onClick={() => fetchGameBooks(booksPagination.currentPage + 1)}
+              disabled={booksLoading}
+              className="mt-3 w-full py-2 text-[10px] font-semibold text-indigo-600 border border-indigo-100 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+            >
+              {booksLoading ? 'Loading...' : `Load More (${gameBooks.length} / ${booksPagination.total})`}
+            </button>
+          )}
         </div>
       </div>
     </div>

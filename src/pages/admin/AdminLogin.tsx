@@ -9,8 +9,8 @@ export const AdminLogin: React.FC = () => {
   const { showToast } = useToast();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('admin@gmail.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,7 +28,7 @@ export const AdminLogin: React.FC = () => {
         showToast('Login successful. Welcome Admin!', 'success');
         navigate('/admin/dashboard');
       } else {
-        showToast('Invalid credentials. Use admin@gmail.com / admin123.', 'error');
+        showToast('Invalid email or password.', 'error');
       }
     } catch (err) {
       showToast('An error occurred during login.', 'error');
@@ -103,15 +103,6 @@ export const AdminLogin: React.FC = () => {
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
-              </div>
-            </div>
-
-            {/* DEMO CREDENTIALS HELPER */}
-            <div className="rounded-xl bg-indigo-50/50 border border-indigo-100 p-3 text-[11px] text-indigo-700 leading-normal">
-              <span className="font-bold uppercase tracking-wider block mb-1">Demo Credentials:</span>
-              <div className="flex justify-between">
-                <span>Email: <strong className="font-semibold select-all">admin@gmail.com</strong></span>
-                <span>Pass: <strong className="font-semibold select-all">admin123</strong></span>
               </div>
             </div>
 
