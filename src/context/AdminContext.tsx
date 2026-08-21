@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination } from '../types';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 
 interface AdminContextType {
   // Auth
