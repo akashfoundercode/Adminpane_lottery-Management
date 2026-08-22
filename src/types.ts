@@ -136,3 +136,22 @@ export interface ListPagination {
   prevPageUrl: string | null;
   hasMore: boolean;
 }
+
+export interface ContactSettings {
+  contact_number: string;
+  email: string;
+  address: string;
+  website: string;
+  whatsapp_url: string;
+  facebook_url: string;
+  instagram_url: string;
+  youtube_url: string;
+  twitter_url: string;
+}
+
+export interface LiveBannerSettings {
+  youtube_live_url: string;
+  facebook_live_url: string;
+  banners: string[];
+  banner_ids?: Array<number | string>;
+}

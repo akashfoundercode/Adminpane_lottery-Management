@@ -1,10 +1,155 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
-import { Search, Plus, Edit, Trash2, ToggleLeft, ToggleRight, BookOpen, CalendarDays, Clock, IndianRupee, ChevronRight, AlertCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, ToggleLeft, ToggleRight, BookOpen, CalendarDays, Clock, IndianRupee, ChevronRight, AlertCircle, X, UploadCloud, Save } from 'lucide-react';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { useToast } from '../../context/ToastContext';
 import { PageLoader } from '../../components/PageLoader';
+
+const LiveBannerModal: React.FC<{
+  gameId: string;
+  gameName: string;
+  onClose: () => void;
+  onSaved: () => void;
+}> = ({ gameId, gameName, onClose, onSaved }) => {
+  const { games, fetchLiveBanners, saveLiveBanners, deleteLiveBanner } = useAdmin();
+  const { showToast } = useToast();
+  const [activeGameId, setActiveGameId] = useState(gameId);
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [existingBanners, setExistingBanners] = useState<string[]>([]);
+  const [bannerIds, setBannerIds] = useState<Array<number | string>>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    let mounted = true;
+    fetchLiveBanners(activeGameId)
+      .then(settings => {
+        if (!mounted) return;
+        setYoutubeUrl(settings.youtube_live_url);
+        setFacebookUrl(settings.facebook_live_url);
+        setExistingBanners(settings.banners);
+        setBannerIds(settings.banner_ids || []);
+      })
+      .catch(error => showToast(error.message || 'Failed to load live banners.', 'error'))
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [activeGameId]);
+
+  const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFiles(Array.from(event.target.files || []));
+  };
+
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      const saved = await saveLiveBanners(activeGameId, {
+        youtube_live_url: youtubeUrl,
+        facebook_live_url: facebookUrl,
+        banners: selectedFiles,
+        existing_banners: existingBanners
+      });
+      setExistingBanners(saved.banners);
+      setBannerIds(saved.banner_ids || []);
+      setSelectedFiles([]);
+      showToast('Live banners updated successfully.', 'success');
+      onSaved();
+    } catch (error: any) {
+      showToast(error.message || 'Failed to save live banners.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBanner = async (index: number) => {
+    const bannerId = bannerIds[index];
+    if (bannerId === undefined) {
+      showToast('Banner ID is missing. Reload banners and try again.', 'error');
+      return;
+    }
+    try {
+      await deleteLiveBanner(activeGameId, bannerId);
+      setExistingBanners(prev => prev.filter((_, itemIndex) => itemIndex !== index));
+      setBannerIds(prev => prev.filter((_, itemIndex) => itemIndex !== index));
+      showToast('Banner deleted successfully.', 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to delete banner.', 'error');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 sm:p-8" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-5 sm:p-6 my-4">
+        <button type="button" onClick={onClose} aria-label="Close live banner modal" className="absolute right-5 top-5 p-2 rounded-lg bg-slate-50 border border-border-light text-text-secondary hover:text-text-primary">
+          <X className="w-4 h-4" />
+        </button>
+        <h2 className="text-[18px] font-bold text-text-primary font-display">Create Banner</h2>
+        <p className="text-xs text-text-secondary mt-1 mb-6">Manage live links and banners for {games.find(game => game.id === activeGameId)?.name || gameName}</p>
+
+        {loading ? <PageLoader /> : (
+          <form onSubmit={handleSave} className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Game</label>
+              <select value={activeGameId} onChange={event => setActiveGameId(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary">
+                {games.map(game => <option key={game.id} value={game.id}>{game.name} ({game.gameCode})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">YouTube Live URL</label>
+              <input type="url" value={youtubeUrl} onChange={event => setYoutubeUrl(event.target.value)} placeholder="https://youtube.com/live/abc123" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Facebook Live URL</label>
+              <input type="url" value={facebookUrl} onChange={event => setFacebookUrl(event.target.value)} placeholder="https://facebook.com/example/live" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Live Banners</label>
+              <label className="flex items-center gap-2 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/60 rounded-xl px-4 py-4 cursor-pointer transition-colors">
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="sr-only" />
+                <UploadCloud className="w-5 h-5 text-indigo-500" />
+                <span className="text-xs font-semibold text-text-primary">Select banner images</span>
+                <span className="text-[10px] text-text-secondary ml-auto">JPG, PNG, WEBP</span>
+              </label>
+              {selectedFiles.length > 0 && <p className="text-[10px] text-indigo-600 mt-2">{selectedFiles.map(file => file.name).join(', ')}</p>}
+            </div>
+
+            {existingBanners.length > 0 && (
+              <div>
+                <p className="block text-[10px] font-bold text-text-secondary uppercase mb-2">Current Banners</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {existingBanners.map((banner, index) => (
+                    <div key={`${banner}-${index}`} className="relative group">
+                      <img src={banner} alt={`Live banner ${index + 1}`} className="h-20 w-full object-cover rounded-lg border border-slate-200" />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteBanner(index)}
+                        aria-label={`Delete banner ${index + 1}`}
+                        className="absolute top-1 right-1 p-1 rounded-md bg-white/90 text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-4 border-t border-border-light">
+              <button type="button" onClick={onClose} className="px-4 py-2 border border-border-light bg-white rounded-xl text-xs font-semibold text-text-secondary hover:bg-slate-50">Cancel</button>
+              <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm">
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving...' : 'Save Banners'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const AdminGames: React.FC = () => {
   const { games, gamesPagination, deleteGame, toggleGameStatus, fetchGames, loadingGames } = useAdmin();
@@ -18,6 +163,7 @@ export const AdminGames: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [bannerGame, setBannerGame] = useState<{ id: string; name: string } | null>(null);
 
   const parseGameDate = (date: string, time = '00:00') => {
     const safeTime = time.split(':').slice(0, 2).join(':') || '00:00';
@@ -101,10 +247,10 @@ export const AdminGames: React.FC = () => {
   };
 
   const statusColors: Record<string, { bg: string; text: string; dot: string }> = {
-    Live:      { bg: 'bg-emerald-50',  text: 'text-emerald-700', dot: 'bg-emerald-500' },
-    Upcoming:  { bg: 'bg-sky-50',      text: 'text-sky-700',     dot: 'bg-sky-500' },
-    Completed: { bg: 'bg-violet-50',   text: 'text-violet-700',  dot: 'bg-violet-500' },
-    Cancelled: { bg: 'bg-rose-50',     text: 'text-rose-700',    dot: 'bg-rose-500' },
+    Live: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+    Upcoming: { bg: 'bg-sky-50', text: 'text-sky-700', dot: 'bg-sky-500' },
+    Completed: { bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500' },
+    Cancelled: { bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' },
   };
 
   const statuses = ['All', 'Live', 'Upcoming', 'Completed', 'Cancelled'];
@@ -117,13 +263,24 @@ export const AdminGames: React.FC = () => {
           <h2 className="text-[20px] font-bold text-text-primary font-display">Games Management</h2>
           <p className="text-xs text-text-secondary">Sorted by status and draw date so the next game is easy to find</p>
         </div>
-        <Link
-          to="/admin/games/create"
-          className="inline-flex items-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Game</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/admin/games/create"
+            className="inline-flex items-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Game</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => games[0] && setBannerGame({ id: games[0].id, name: games[0].name })}
+            disabled={games.length === 0}
+            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span>Create Banner</span>
+          </button>
+        </div>
       </div>
 
       {/* SEARCH + STATUS PILLS */}
@@ -143,11 +300,10 @@ export const AdminGames: React.FC = () => {
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                statusFilter === s
-                  ? 'bg-[#6366f1] text-white shadow-sm'
-                  : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${statusFilter === s
+                ? 'bg-[#6366f1] text-white shadow-sm'
+                : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
+                }`}
             >
               {s === 'All' ? `All (${games.length})` : `${s} (${games.filter(g => g.status === s).length})`}
             </button>
@@ -308,6 +464,23 @@ export const AdminGames: React.FC = () => {
         type="danger"
         confirmText="Delete Game"
       />
+      <button
+        type="button"
+        onClick={() => setBannerGame({ id: game.id, name: game.name })}
+        title="Create Banner"
+        className="text-text-secondary hover:text-indigo-600 transition-colors"
+      >
+        <UploadCloud className="w-3.5 h-3.5" />
+      </button>
+
+      {bannerGame && (
+        <LiveBannerModal
+          gameId={bannerGame.id}
+          gameName={bannerGame.name}
+          onClose={() => setBannerGame(null)}
+          onSaved={() => setBannerGame(null)}
+        />
+      )}
     </div>
   );
 };

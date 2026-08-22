@@ -1,0 +1,9 @@
+export { default as Login } from '../../../pages/Login';
+export { default as Dashboard } from '../../../pages/Dashboard';
+export { default as Books } from '../../../pages/Books';
+export { default as BookDetails } from '../../../pages/BookDetails';
+export { default as HistorySold } from '../../../pages/HistorySold';
+export { default as HistoryUnsold } from '../../../pages/HistoryUnsold';
+export { default as HistoryExpired } from '../../../pages/HistoryExpired';
+export { default as Winnings } from '../../../pages/Winnings';
+export { default as Profile } from '../../../pages/Profile';

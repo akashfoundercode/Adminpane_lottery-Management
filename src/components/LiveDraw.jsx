@@ -4,15 +4,24 @@ import { Radio, Heart, MessageCircle, Send, Play, Tv, Volume2 } from 'lucide-rea
 import GlassCard from './ui/GlassCard';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import { getPublicLiveBanners } from '../services/liveBannerService';
 
-const LiveDraw = () => {
+const LiveDraw = ({ gameId }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [liveBanners, setLiveBanners] = useState(null);
   const [comments, setComments] = useState([
     { id: 1, user: 'Aman S.', text: 'Got my ticket! Good luck everyone!', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&fit=crop&q=60' },
     { id: 2, user: 'Rohit K.', text: 'Is Galo-Malo draw today?', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&fit=crop&q=60' },
     { id: 3, user: 'Priya D.', text: 'Fortuner is mine today! 🤞', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&fit=crop&q=60' }
   ]);
   const [newComment, setNewComment] = useState('');
+
+  useEffect(() => {
+    if (!gameId) return;
+    getPublicLiveBanners(gameId)
+      .then(setLiveBanners)
+      .catch(error => console.error('API Error fetching public live banners:', error));
+  }, [gameId]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -61,7 +70,7 @@ const LiveDraw = () => {
       <div className="absolute bottom-[10%] left-[10%] w-72 h-72 rounded-full bg-gold/5 blur-[100px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
-        
+
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
           <Badge variant="live" className="animate-pulse">LIVE DRAW ROOM</Badge>
@@ -75,17 +84,17 @@ const LiveDraw = () => {
 
         {/* Live Draw Monitor Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-          
+
           {/* Stream Player Container */}
           <div className="lg:col-span-8">
             <div className="relative aspect-video rounded-[28px] overflow-hidden border border-black/10 shadow-2xl bg-black/5 flex items-center justify-center group">
-              
+
               {/* Stream Video Placeholder */}
               {!isPlaying ? (
-                <div className="absolute inset-0 bg-cover bg-center flex flex-col items-center justify-center p-6 text-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=1200&fit=crop&q=80')" }}>
+                <div className="absolute inset-0 bg-cover bg-center flex flex-col items-center justify-center p-6 text-center" style={{ backgroundImage: `url('${liveBanners?.banners?.[0] || 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=1200&fit=crop&q=80'}')` }}>
                   {/* Black overlay */}
                   <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-0" />
-                  
+
                   <div className="relative z-10 space-y-6 max-w-md">
                     <div className="w-20 h-20 rounded-full bg-gold/20 border border-gold/40 hover:border-gold/70 flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(197,160,89,0.35)] hover:scale-110 transition-all duration-300 cursor-pointer" onClick={() => setIsPlaying(true)}>
                       <Play className="w-8 h-8 text-[#0A2114] fill-current ml-1" />
@@ -99,9 +108,9 @@ const LiveDraw = () => {
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-tr from-[#E6EFEA] via-[#F4FAF6] to-[#F2EFE8] z-0">
                   <div className="relative flex flex-col items-center justify-center text-center">
-                    
+
                     {/* Simulated Draw Machine Drum */}
-                    <motion.div 
+                    <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
                       className="w-48 h-48 rounded-full border-4 border-dashed border-gold/60 flex items-center justify-center relative shadow-[0_0_50px_rgba(197,160,89,0.1)]"
@@ -109,13 +118,13 @@ const LiveDraw = () => {
                       <div className="w-36 h-36 rounded-full border-2 border-emerald/20 flex items-center justify-center">
                         <span className="font-display font-black text-3xl text-[#87641B] tracking-widest animate-pulse">AUREUM</span>
                       </div>
-                      
+
                       {/* Floating balls */}
                       <div className="absolute top-4 left-6 w-8 h-8 rounded-full bg-emerald text-white font-bold flex items-center justify-center text-xs shadow-lg">14</div>
                       <div className="absolute bottom-6 right-4 w-8 h-8 rounded-full bg-gold text-[#0A2114] font-bold flex items-center justify-center text-xs shadow-lg">07</div>
                       <div className="absolute bottom-8 left-8 w-8 h-8 rounded-full bg-white text-[#0A2114] border border-black/5 font-bold flex items-center justify-center text-xs shadow-lg">92</div>
                     </motion.div>
-                    
+
                     <div className="mt-8 space-y-1">
                       <p className="text-xs font-semibold text-emerald uppercase tracking-widest flex items-center gap-1.5 justify-center">
                         <span className="h-2 w-2 rounded-full bg-[#0F8253] animate-ping" /> Server Connected
@@ -158,8 +167,8 @@ const LiveDraw = () => {
                       <span className="w-8 h-8 rounded-full border border-black/10 bg-black/5 font-semibold text-sm flex items-center justify-center text-[#3E4A42]/30">?</span>
                     </div>
                   </div>
-                  
-                  <button 
+
+                  <button
                     onClick={() => setIsPlaying(false)}
                     className="px-4 py-2 text-xs font-semibold rounded-xl bg-red-600/80 hover:bg-red-600 text-white backdrop-blur-md transition-all cursor-pointer"
                   >
@@ -183,16 +192,16 @@ const LiveDraw = () => {
               <div className="flex-1 space-y-3.5 overflow-y-auto mb-4 pr-1 text-left scrollbar-thin">
                 <AnimatePresence>
                   {comments.map((comment) => (
-                    <motion.div 
+                    <motion.div
                       key={comment.id}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       className="flex items-start gap-2.5"
                     >
-                      <img 
-                        src={comment.avatar} 
+                      <img
+                        src={comment.avatar}
                         alt={comment.user}
-                        className="w-7 h-7 rounded-full object-cover border border-black/5" 
+                        className="w-7 h-7 rounded-full object-cover border border-black/5"
                       />
                       <div className="bg-white/60 rounded-2xl rounded-tl-none p-2.5 border border-black/5 max-w-[85%]">
                         <span className="block text-[10px] font-bold text-[#87641B] mb-0.5">{comment.user}</span>

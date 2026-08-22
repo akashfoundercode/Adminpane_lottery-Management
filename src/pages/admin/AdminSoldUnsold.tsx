@@ -7,7 +7,7 @@ import { AlertCircle, Calendar, CheckCircle2, Filter, Search, XCircle } from 'lu
 export const AdminSoldUnsold: React.FC = () => {
     const { books, booksTotal, games, booksPagination, agents, fetchBooks, updateBookStatus } = useAdmin();
     const { showToast } = useToast();
-    const [statusFilter, setStatusFilter] = useState<'All' | 'Sold' | 'Unsold'>('All');
+    const [statusFilter, setStatusFilter] = useState<'All' | 'Sold' | 'Unsold' | 'Unsold by Admin'>('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [gameFilter, setGameFilter] = useState('All');
     const [agentFilter, setAgentFilter] = useState('All');
@@ -26,7 +26,7 @@ export const AdminSoldUnsold: React.FC = () => {
 
     const soldUnsoldHistory = useMemo(() => {
         return books.filter(book => {
-            const soldUnsoldStatus = book.status === 'Unsold by Admin' ? 'Unsold' : book.status;
+            const soldUnsoldStatus = book.status;
             const query = searchTerm.toLowerCase();
             const resolvedAgentName = getAgentName(book.agentId, book.agentName);
             const matchesSearch = [book.id, book.bookName, resolvedAgentName, book.agentId]
@@ -35,7 +35,7 @@ export const AdminSoldUnsold: React.FC = () => {
             const matchesStatus = statusFilter === 'All' || soldUnsoldStatus === statusFilter;
             const matchesGame = gameFilter === 'All' || book.gameName === gameFilter;
             const matchesAgent = agentFilter === 'All' || book.agentId === agentFilter;
-            return (soldUnsoldStatus === 'Sold' || soldUnsoldStatus === 'Unsold') &&
+            return (soldUnsoldStatus === 'Sold' || soldUnsoldStatus === 'Unsold' || soldUnsoldStatus === 'Unsold by Admin') &&
                 matchesSearch && matchesStatus && matchesGame && matchesAgent;
         });
     }, [books, agents, searchTerm, statusFilter, gameFilter, agentFilter]);
@@ -87,7 +87,7 @@ export const AdminSoldUnsold: React.FC = () => {
                         <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
                     <div className="flex gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1">
-                        {(['All', 'Sold', 'Unsold'] as const).map(status => (
+                        {(['All', 'Sold', 'Unsold', 'Unsold by Admin'] as const).map(status => (
                             <button
                                 key={status}
                                 onClick={() => setStatusFilter(status)}
@@ -123,7 +123,7 @@ export const AdminSoldUnsold: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-border-light">
                                     {soldUnsoldHistory.map(book => {
-                                        const status = book.status === 'Unsold by Admin' ? 'Unsold' : book.status;
+                                        const status = book.status;
                                         return (
                                             <tr key={book.id} className="hover:bg-slate-50/30">
                                                 <td className="py-3 px-4 font-semibold text-text-primary">{getAgentName(book.agentId, book.agentName)}</td>
@@ -135,7 +135,7 @@ export const AdminSoldUnsold: React.FC = () => {
                                                     <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{book.status === 'Sold' ? ((book as any).soldDate || '-') : ((book as any).unsoldDate || '-')}</span>
                                                 </td>
                                                 <td className="py-3 px-4">
-                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold ${status === 'Sold' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold ${status === 'Sold' ? 'bg-emerald-100 text-emerald-800' : status === 'Unsold by Admin' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
                                                         {status === 'Sold' ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                                                         {status}
                                                     </span>
@@ -144,17 +144,17 @@ export const AdminSoldUnsold: React.FC = () => {
                                                     <div className="flex gap-1.5">
                                                         <button
                                                             onClick={() => setPendingStatus({ bookId: book.id, status: 'Sold' })}
-                                                            disabled={status === 'Sold'}
+                                                            disabled={status === 'Sold' || status === 'Unsold by Admin'}
                                                             className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[9px] font-bold hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                                         >
                                                             Sold
                                                         </button>
                                                         <button
                                                             onClick={() => setPendingStatus({ bookId: book.id, status: 'Unsold' })}
-                                                            disabled={status === 'Unsold'}
+                                                            disabled={status === 'Unsold' || status === 'Unsold by Admin'}
                                                             className="px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-[9px] font-bold hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                                         >
-                                                            Unsold
+                                                            {status === 'Unsold by Admin' ? 'Locked' : 'Unsold'}
                                                         </button>
                                                     </div>
                                                 </td>

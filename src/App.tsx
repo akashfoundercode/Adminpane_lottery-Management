@@ -1,52 +1,49 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AgentProvider } from './context/AgentContext';
-import { AdminProvider } from './context/AdminContext';
-import { ToastProvider } from './context/ToastContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { AgentLayout } from './components/AgentLayout';
+import { AgentProvider, AdminProvider, ToastProvider } from './shared/contexts';
+import { AdminProtectedRoute, ProtectedRoute } from './shared/components';
+import { AgentLayout, AdminLayout } from './layouts';
 
 // Agent Pages
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Books from './pages/Books';
-import BookDetails from './pages/BookDetails';
-import HistorySold from './pages/HistorySold';
-import HistoryUnsold from './pages/HistoryUnsold';
-import HistoryExpired from './pages/HistoryExpired';
-import Winnings from './pages/Winnings';
-import Profile from './pages/Profile';
+import {
+  Login,
+  Dashboard,
+  Books,
+  BookDetails,
+  HistorySold,
+  HistoryUnsold,
+  HistoryExpired,
+  Winnings,
+  Profile
+} from './modules/agent/pages';
 
 // Admin Core Imports
-import { AdminProvider as InternalAdminProvider } from './context/AdminContext';
-import { AdminProtectedRoute } from './components/AdminProtectedRoute';
-import { AdminLayout } from './components/AdminLayout';
-
-// Admin Pages
-import AdminLogin from './pages/admin/AdminLogin';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminGames from './pages/admin/AdminGames';
-import AdminGameCreate from './pages/admin/AdminGameCreate';
-import AdminGameDetails from './pages/admin/AdminGameDetails';
-import AdminBooks from './pages/admin/AdminBooks';
-import AdminBookDetails from './pages/admin/AdminBookDetails';
-import AdminGenerateBooks from './pages/admin/AdminGenerateBooks';
-import AdminBookAssignment from './pages/admin/AdminBookAssignment';
-import AdminAssignmentHistory from './pages/admin/AdminAssignmentHistory';
-import AdminSoldUnsold from './pages/admin/AdminSoldUnsold';
-import AdminAgentsFirstParty from './pages/admin/AdminAgentsFirstParty';
-import AdminAgentsThirdParty from './pages/admin/AdminAgentsThirdParty';
-import AdminAgentDetails from './pages/admin/AdminAgentDetails';
-import AdminAgentPerformance from './pages/admin/AdminAgentPerformance';
-import AdminPrizes from './pages/admin/AdminPrizes';
-import AdminResults from './pages/admin/AdminResults';
-import AdminUploadResult from './pages/admin/AdminUploadResult';
-import AdminWinners from './pages/admin/AdminWinners';
-import AdminReportsSales from './pages/admin/AdminReportsSales';
-import AdminReportsBooks from './pages/admin/AdminReportsBooks';
-import AdminReportsAgents from './pages/admin/AdminReportsAgents';
-import AdminReportsWinning from './pages/admin/AdminReportsWinning';
-import AdminSettings from './pages/admin/AdminSettings';
+import {
+  AdminLogin,
+  AdminDashboard,
+  AdminGames,
+  AdminGameCreate,
+  AdminGameDetails,
+  AdminBooks,
+  AdminBookDetails,
+  AdminGenerateBooks,
+  AdminBookAssignment,
+  AdminAssignmentHistory,
+  AdminSoldUnsold,
+  AdminAgentsFirstParty,
+  AdminAgentsThirdParty,
+  AdminAgentDetails,
+  AdminAgentPerformance,
+  AdminPrizes,
+  AdminResults,
+  AdminUploadResult,
+  AdminWinners,
+  AdminReportsSales,
+  AdminReportsBooks,
+  AdminReportsAgents,
+  AdminReportsWinning,
+  AdminSettings
+} from './modules/admin/pages';
 
 function App() {
   return (

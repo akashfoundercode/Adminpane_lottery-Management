@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Save, RefreshCw, LogOut, ShieldAlert, Settings, User, Key, Database } from 'lucide-react';
+import { Save, LogOut, ShieldAlert, Settings, User, Key, Database, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const AdminSettings: React.FC = () => {
-  const { adminUser, updateSettings, resetSystem, adminLogout } = useAdmin();
+  const { adminUser, updateSettings, resetSystem, adminLogout, contactSettings, fetchContactSettings, saveContactSettings } = useAdmin();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -17,6 +17,16 @@ export const AdminSettings: React.FC = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [contactForm, setContactForm] = useState(contactSettings);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+
+  React.useEffect(() => {
+    fetchContactSettings();
+  }, []);
+
+  React.useEffect(() => {
+    setContactForm(contactSettings);
+  }, [contactSettings]);
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +49,23 @@ export const AdminSettings: React.FC = () => {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+  };
+
+  const updateContactField = (field: keyof typeof contactForm, value: string) => {
+    setContactForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingContact(true);
+    try {
+      await saveContactSettings(contactForm);
+      showToast('Contact settings updated successfully.', 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to update contact settings.', 'error');
+    } finally {
+      setIsSavingContact(false);
+    }
   };
 
   const handleResetSystem = () => {
@@ -74,6 +101,14 @@ export const AdminSettings: React.FC = () => {
               <LogOut className="w-4 h-4" />
               <span>Logout Admin</span>
             </button>
+            <button
+              type="button"
+              onClick={() => document.getElementById('contact-settings')?.scrollIntoView({ behavior: 'smooth' })}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold text-text-secondary hover:bg-slate-50 hover:text-indigo-700 transition-colors"
+            >
+              <Phone className="w-4 h-4" />
+              <span>Contact Settings</span>
+            </button>
           </div>
 
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3 shadow-sm">
@@ -99,7 +134,7 @@ export const AdminSettings: React.FC = () => {
         {/* RIGHT COLUMN: FORMS */}
         <div className="lg:col-span-2 space-y-6">
           {/* PROFILE FORM */}
-          <div className="premium-card p-5 bg-white border border-border-light shadow-sm">
+          <div id="contact-settings" className="premium-card p-5 bg-white border border-border-light shadow-sm">
             <h3 className="font-display font-semibold text-text-primary text-xs uppercase tracking-wider border-b border-border-light pb-2 mb-4 flex items-center gap-1.5">
               <User className="w-4 h-4 text-indigo-500" />
               <span>Admin Profile Details</span>
@@ -175,6 +210,47 @@ export const AdminSettings: React.FC = () => {
               >
                 <Save className="w-4 h-4" />
                 <span>Update Password</span>
+              </button>
+            </form>
+          </div>
+
+          {/* CONTACT SETTINGS */}
+          <div className="premium-card p-5 bg-white border border-border-light shadow-sm">
+            <h3 className="font-display font-semibold text-text-primary text-xs uppercase tracking-wider border-b border-border-light pb-2 mb-4 flex items-center gap-1.5">
+              <Phone className="w-4 h-4 text-indigo-500" />
+              <span>Contact Settings</span>
+            </h3>
+            <form onSubmit={handleContactSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {([
+                  ['contact_number', 'Contact Number', 'tel'],
+                  ['email', 'Support Email', 'email'],
+                  ['address', 'Address', 'text'],
+                  ['website', 'Website', 'url'],
+                  ['whatsapp_url', 'WhatsApp URL', 'url'],
+                  ['facebook_url', 'Facebook URL', 'url'],
+                  ['instagram_url', 'Instagram URL', 'url'],
+                  ['youtube_url', 'YouTube URL', 'url'],
+                  ['twitter_url', 'Twitter / X URL', 'url']
+                ] as const).map(([field, label, type]) => (
+                  <div key={field} className={field === 'address' ? 'md:col-span-2' : ''}>
+                    <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">{label}</label>
+                    <input
+                      type={type}
+                      value={contactForm[field]}
+                      onChange={e => updateContactField(field, e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                type="submit"
+                disabled={isSavingContact}
+                className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSavingContact ? 'Saving...' : 'Save Contact Settings'}</span>
               </button>
             </form>
           </div>

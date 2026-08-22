@@ -16,6 +16,11 @@ export default defineConfig({
         target: 'https://test.hashoster.co.in/',
         changeOrigin: true,
         secure: false,
+      },
+      '/user': {
+        target: 'https://test.hashoster.co.in/',
+        changeOrigin: true,
+        secure: false,
       }
     }
   }

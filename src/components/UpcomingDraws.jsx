@@ -4,6 +4,7 @@ import { Calendar, Ticket, ChevronRight, Percent, Clock } from 'lucide-react';
 import GlassCard from './ui/GlassCard';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
+import { getPublicLiveBanners } from '../services/liveBannerService';
 
 const CountdownTimer = ({ targetDate }) => {
   const [timeLeft, setTimeLeft] = useState({
@@ -54,6 +55,10 @@ const CountdownTimer = ({ targetDate }) => {
 };
 
 const UpcomingDraws = () => {
+  const [selectedDraw, setSelectedDraw] = useState(null);
+  const [bannerSettings, setBannerSettings] = useState(null);
+  const [isLoadingBanners, setIsLoadingBanners] = useState(false);
+
   const draws = [
     {
       id: 'pineapple-gift-2026',
@@ -113,13 +118,27 @@ const UpcomingDraws = () => {
     }
   ];
 
+  const handleViewBanners = async (draw) => {
+    setSelectedDraw(draw);
+    setBannerSettings(null);
+    setIsLoadingBanners(true);
+    try {
+      const settings = await getPublicLiveBanners(draw.id);
+      setBannerSettings(settings);
+    } catch (error) {
+      setBannerSettings({ error: error.message || 'Unable to load banners.' });
+    } finally {
+      setIsLoadingBanners(false);
+    }
+  };
+
   return (
     <section id="draws" className="relative py-24 bg-bg-secondary/20 border-t border-b border-black/5">
       <div className="absolute top-[30%] left-[5%] w-72 h-72 rounded-full bg-emerald/5 blur-[90px] pointer-events-none" />
       <div className="absolute bottom-[20%] right-[5%] w-80 h-80 rounded-full bg-gold/5 blur-[100px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
-        
+
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-4">
           <div className="text-left space-y-3">
@@ -133,7 +152,7 @@ const UpcomingDraws = () => {
               Explore our verified premium lotteries. Purchase tickets instantly with government-approved security.
             </p>
           </div>
-          
+
           <div className="flex gap-2">
             <span className="px-4 py-2 text-xs font-semibold rounded-full bg-black/5 border border-black/5 text-[#3E4A42]">
               Total Draws Active: 4
@@ -144,27 +163,27 @@ const UpcomingDraws = () => {
         {/* Draws Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
           {draws.map((draw) => (
-            <GlassCard 
-              key={draw.id} 
+            <GlassCard
+              key={draw.id}
               glowColor={draw.accentColor}
               className="flex flex-col justify-between text-left h-full border border-black/5 relative p-0 overflow-hidden group"
             >
               {/* Prize Banner Image */}
               <div className="relative h-48 w-full overflow-hidden">
-                <img 
-                  src={draw.image} 
-                  alt={draw.title} 
+                <img
+                  src={draw.image}
+                  alt={draw.title}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/20 to-transparent pointer-events-none" />
-                
+
                 {/* Badges on Top of Image */}
                 <div className="absolute top-4 left-4 z-10 flex gap-2">
                   {draw.live && <Badge variant="live">LIVE</Badge>}
                   {draw.featured && <Badge variant="featured">FEATURED</Badge>}
                   {!draw.live && !draw.featured && <Badge variant="standard">ACTIVE</Badge>}
                 </div>
-                
+
                 <div className="absolute top-4 right-4 z-10 text-right bg-white/80 backdrop-blur-md px-3 py-1 rounded-xl border border-gold/20 shadow-sm">
                   <span className="text-[9px] text-[#3E4A42]/60 block font-semibold uppercase tracking-wider leading-none">Ticket Price</span>
                   <span className="font-display font-extrabold text-base text-[#87641B]">₹{draw.ticketPrice}</span>
@@ -182,7 +201,7 @@ const UpcomingDraws = () => {
                       <span>★ Bonus:</span> {draw.bonusPrize}
                     </p>
                   </div>
-                  
+
                   <div>
                     <span className="text-[10px] text-[#3E4A42]/60 font-semibold uppercase tracking-wider block">Grand 1st Prize</span>
                     <p className="text-2xl font-black text-[#0A2114] font-display leading-tight">{draw.prize}</p>
@@ -213,7 +232,7 @@ const UpcomingDraws = () => {
                       <span className="text-[#87641B] font-bold">{draw.soldPercentage}%</span>
                     </div>
                     <div className="w-full bg-black/5 h-2 rounded-full overflow-hidden border border-black/5">
-                      <motion.div 
+                      <motion.div
                         className="bg-gradient-to-r from-gold to-[#A88438] h-full rounded-full"
                         initial={{ width: 0 }}
                         animate={{ width: `${draw.soldPercentage}%` }}
@@ -227,22 +246,61 @@ const UpcomingDraws = () => {
                 <div className="pt-4 border-t border-black/5 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2 text-xs text-[#3E4A42]/60">
                     <Calendar className="w-4 h-4" />
-                    <span>Draw: {new Date(draw.drawDate).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
+                    <span>Draw: {new Date(draw.drawDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                   </div>
 
-                  <Button 
-                    variant={draw.accentColor} 
-                    className="px-6 py-2.5 text-xs rounded-2xl"
-                    onClick={() => alert(`Ticket booking initialized for: ${draw.title}`)}
-                  >
-                    Book Now <ChevronRight className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleViewBanners(draw)}
+                      className="px-3 py-2.5 text-[10px] font-bold rounded-xl border border-black/10 text-[#3E4A42] hover:border-gold hover:text-[#87641B] transition-colors"
+                    >
+                      View Banners
+                    </button>
+                    <Button
+                      variant={draw.accentColor}
+                      className="px-6 py-2.5 text-xs rounded-2xl"
+                      onClick={() => alert(`Ticket booking initialized for: ${draw.title}`)}
+                    >
+                      Book Now <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </GlassCard>
           ))}
         </div>
       </div>
+
+      {selectedDraw && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedDraw(null); }}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 relative">
+            <button type="button" onClick={() => setSelectedDraw(null)} aria-label="Close banners" className="absolute right-4 top-4 p-2 rounded-lg hover:bg-black/5 text-[#3E4A42]">×</button>
+            <h3 className="font-display font-bold text-xl text-[#0A2114] pr-10">{selectedDraw.title} Banners</h3>
+            {isLoadingBanners ? (
+              <p className="text-sm text-[#3E4A42]/70 py-10 text-center">Loading banners...</p>
+            ) : bannerSettings?.error ? (
+              <p className="text-sm text-red-600 py-10 text-center">{bannerSettings.error}</p>
+            ) : (
+              <div className="mt-5 space-y-5">
+                {bannerSettings?.banners?.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {bannerSettings.banners.map((banner, index) => (
+                      <img key={`${banner}-${index}`} src={banner} alt={`${selectedDraw.title} banner ${index + 1}`} className="w-full h-40 object-cover rounded-xl border border-black/10" />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#3E4A42]/70 py-6 text-center">No banners available for this draw.</p>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-black/5 pt-4 text-xs">
+                  <a href={bannerSettings?.youtube_live_url || '#'} target="_blank" rel="noreferrer" className="text-red-600 font-semibold truncate">YouTube Live</a>
+                  <a href={bannerSettings?.facebook_live_url || '#'} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold truncate">Facebook Live</a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 };

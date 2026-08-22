@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination } from '../types';
+import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination, ContactSettings, LiveBannerSettings } from '../types';
 
 
 interface AdminContextType {
@@ -67,6 +67,12 @@ interface AdminContextType {
   updateWinnerClaimStatus: (ticketNumber: string, bookId: string, claimStatus: 'Pending' | 'Claimed' | 'Rejected') => void;
   updateSettings: (settings: any) => void;
   resetSystem: () => void;
+  contactSettings: ContactSettings;
+  fetchContactSettings: () => Promise<void>;
+  saveContactSettings: (settings: ContactSettings) => Promise<void>;
+  fetchLiveBanners: (gameId: string) => Promise<LiveBannerSettings>;
+  saveLiveBanners: (gameId: string, settings: { youtube_live_url: string; facebook_live_url: string; banners: File[]; existing_banners?: string[] }) => Promise<LiveBannerSettings>;
+  deleteLiveBanner: (gameId: string, bannerId: number | string) => Promise<void>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -79,6 +85,18 @@ const EMPTY_PAGINATION: ListPagination = {
   nextPageUrl: null,
   prevPageUrl: null,
   hasMore: false
+};
+
+const EMPTY_CONTACT_SETTINGS: ContactSettings = {
+  contact_number: '',
+  email: '',
+  address: '',
+  website: '',
+  whatsapp_url: '',
+  facebook_url: '',
+  instagram_url: '',
+  youtube_url: '',
+  twitter_url: ''
 };
 
 const readPagination = (json: any, itemCount: number, limit: number, offset: number): ListPagination => {
@@ -150,6 +168,16 @@ const appendUnique = <T extends { id: string }>(current: T[], incoming: T[]) => 
 const toNumber = (value: any, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeBookStatus = (value: unknown): Book['status'] => {
+  const status = String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  if (status === 'sold') return 'Sold';
+  if (status === 'unsold') return 'Unsold';
+  if (status === 'unsold by admin' || status === 'expired' || status === 'reclaimed') return 'Unsold by Admin';
+  if (status === 'assigned') return 'Assigned';
+  if (status === 'in progress') return 'In Progress';
+  return 'Available';
 };
 
 // Core Mock Data matching screen statistics
@@ -388,6 +416,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingResults, setLoadingResults] = useState(false);
+  const [contactSettings, setContactSettings] = useState<ContactSettings>(EMPTY_CONTACT_SETTINGS);
 
   const [winnings, setWinnings] = useState<Winning[]>(() => {
     const stored = localStorage.getItem('lucky_draw_winnings');
@@ -561,13 +590,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (json.success) {
           const mappedBooks: Book[] = rawBooks.map((b: any) => {
-            let mappedStatus: Book['status'] = 'Available';
-            const apiStatus = String(b.status).toLowerCase();
-            if (apiStatus === 'assigned') mappedStatus = 'Assigned';
-            else if (apiStatus === 'in progress') mappedStatus = 'In Progress';
-            else if (apiStatus === 'sold') mappedStatus = 'Sold';
-            else if (apiStatus === 'unsold') mappedStatus = 'Unsold';
-            else if (apiStatus === 'unsold by admin') mappedStatus = 'Unsold by Admin';
+            const mappedStatus = normalizeBookStatus(b.status);
 
             const gameName = b.game?.game_name
               || gamesRef.current.find(g => g.id === String(b.game_id))?.name
@@ -793,9 +816,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     prizes: (() => {
       const raw: any[] = r.book_winner_prizes || r.ticket_winner_prizes
         ? [
-            ...(r.book_winner_prizes || []).map((p: any) => ({ ...p, prize_type: 'book_winner' })),
-            ...(r.ticket_winner_prizes || []).map((p: any) => ({ ...p, prize_type: 'ticket_winner' }))
-          ]
+          ...(r.book_winner_prizes || []).map((p: any) => ({ ...p, prize_type: 'book_winner' })),
+          ...(r.ticket_winner_prizes || []).map((p: any) => ({ ...p, prize_type: 'ticket_winner' }))
+        ]
         : getRawResultPrizes(r);
       return mapResultPrizes(raw);
     })(),
@@ -863,6 +886,128 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return mapped;
   };
 
+  const getContactSettingsPayload = (json: any): Partial<ContactSettings> => {
+    const payload = json?.data && !Array.isArray(json.data) ? json.data : json;
+    return payload?.data && !Array.isArray(payload.data) ? payload.data : payload;
+  };
+
+  const fetchContactSettings = async () => {
+    const token = localStorage.getItem('admin_token') || '';
+    try {
+      const response = await fetch('/api/v1/admin/contact-settings', {
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch contact settings.');
+      const json = await response.json();
+      const payload = getContactSettingsPayload(json);
+      setContactSettings(prev => ({ ...prev, ...payload }));
+    } catch (err) {
+      console.error('API Error fetching contact settings:', err);
+    }
+  };
+
+  const getLiveBannerPayload = (json: any): LiveBannerSettings => {
+    const first = json?.data && !Array.isArray(json.data) ? json.data : json;
+    const payload = first?.data && !Array.isArray(first.data) ? first.data : first;
+    const rawBanners = payload?.banners || payload?.banner_urls || payload?.images || [];
+    return {
+      youtube_live_url: payload?.youtube_live_url || '',
+      facebook_live_url: payload?.facebook_live_url || '',
+      banner_ids: (Array.isArray(rawBanners) ? rawBanners : [rawBanners]).filter(Boolean).map((banner: any) => banner?.id).filter((id: any) => id !== undefined && id !== null),
+      banners: (Array.isArray(rawBanners) ? rawBanners : [rawBanners])
+        .filter(Boolean)
+        .map((banner: any) => getFullImageUrl(typeof banner === 'string' ? banner : banner.image_url || banner.url || banner.path))
+    };
+  };
+
+  const fetchLiveBanners = async (gameId: string): Promise<LiveBannerSettings> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const paths = [
+      `http://127.0.0.1:8000/api/v1/admin/games/${gameId}/live-banners`,
+      `http://127.0.0.1:8000/api/v1/games/${gameId}/live-banners`
+    ];
+    let response = await fetch(paths[0], {
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(paths[1], {
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+      });
+    }
+    let json: any = null;
+    try { json = await response.json(); } catch { /* Empty response handled below. */ }
+    if (!response.ok || json?.success === false) {
+      throw new Error(extractApiErrorMessage(json, 'Failed to fetch live banners.'));
+    }
+    return getLiveBannerPayload(json);
+  };
+
+  const saveLiveBanners = async (gameId: string, settings: { youtube_live_url: string; facebook_live_url: string; banners: File[]; existing_banners?: string[] }): Promise<LiveBannerSettings> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const paths = [
+      `http://127.0.0.1:8000/api/v1/admin/games/${gameId}/live-banners`,
+      `http://127.0.0.1:8000/api/v1/games/${gameId}/live-banners`
+    ];
+    const request = (path: string, method: 'PUT' | 'POST') => {
+      const formData = new FormData();
+      formData.append('youtube_live_url', settings.youtube_live_url);
+      formData.append('facebook_live_url', settings.facebook_live_url);
+      (settings.existing_banners || []).forEach(banner => formData.append('existing_banners[]', banner));
+      settings.banners.forEach(file => formData.append('banners[]', file));
+      return fetch(path, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+    };
+    let response = await request(paths[0], 'PUT');
+    if (response.status === 404 || response.status === 405) response = await request(paths[1], 'PUT');
+    if (response.status === 404 || response.status === 405) response = await request(paths[1], 'POST');
+
+    let json: any = null;
+    try { json = await response.json(); } catch { /* Empty success response. */ }
+    if (!response.ok || json?.success === false) {
+      throw new Error(extractApiErrorMessage(json, 'Failed to save live banners.'));
+    }
+    return getLiveBannerPayload(json);
+  };
+
+  const deleteLiveBanner = async (gameId: string, bannerId: number | string): Promise<void> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const response = await fetch(`http://127.0.0.1:8000/api/v1/admin/games/${gameId}/live-banners/${bannerId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    let json: any = null;
+    try { json = await response.json(); } catch { /* Empty success response. */ }
+    if (!response.ok || json?.success === false) {
+      throw new Error(extractApiErrorMessage(json, 'Failed to delete live banner.'));
+    }
+  };
+
+  const saveContactSettings = async (settings: ContactSettings) => {
+    const token = localStorage.getItem('admin_token') || '';
+    const request = (method: 'PUT' | 'POST') => fetch('/api/v1/admin/contact-settings', {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(settings)
+    });
+
+    let response = await request('PUT');
+    if (response.status === 404 || response.status === 405) {
+      response = await request('POST');
+    }
+
+    let json: any = null;
+    try { json = await response.json(); } catch { /* Empty success response. */ }
+    if (!response.ok || json?.success === false) {
+      throw new Error(extractApiErrorMessage(json, 'Failed to save contact settings.'));
+    }
+
+    const payload = getContactSettingsPayload(json);
+    setContactSettings({ ...settings, ...payload });
+  };
+
   // Fetch games, books, agents, assignment history and results automatically when admin becomes authenticated
   useEffect(() => {
     if (isAdminAuthenticated) {
@@ -871,7 +1016,16 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fetchAgents();
       fetchAssignmentHistory();
       fetchResults();
+      fetchContactSettings();
     }
+  }, [isAdminAuthenticated]);
+
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+
+    const refreshBooks = () => fetchBooks(50, 1, false);
+    const interval = setInterval(refreshBooks, 30000);
+    return () => clearInterval(interval);
   }, [isAdminAuthenticated]);
 
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
@@ -1646,7 +1800,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       restoreResult,
       updateWinnerClaimStatus,
       updateSettings,
-      resetSystem
+      resetSystem,
+      contactSettings,
+      fetchContactSettings,
+      saveContactSettings,
+      fetchLiveBanners,
+      saveLiveBanners,
+      deleteLiveBanner
     }}>
       {children}
     </AdminContext.Provider>

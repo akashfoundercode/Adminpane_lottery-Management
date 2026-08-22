@@ -28,6 +28,16 @@ const EMPTY_BOOKS_PAGINATION: ListPagination = {
   hasMore: false
 };
 
+const normalizeBookStatus = (value: unknown): Book['status'] => {
+  const status = String(value || '').trim().toLowerCase().replace(/[_-]+/g, ' ');
+  if (status === 'sold') return 'Sold';
+  if (status === 'unsold') return 'Unsold';
+  if (status === 'unsold by admin' || status === 'expired' || status === 'reclaimed') return 'Unsold by Admin';
+  if (status === 'in progress') return 'In Progress';
+  if (status === 'available') return 'Available';
+  return 'Assigned';
+};
+
 const DUMMY_AGENT: Agent = {
   id: 'AG1001',
   apiId: 4,
@@ -240,6 +250,14 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const refreshBooks = () => fetchAgentBooks(50, 0, false);
+    const interval = setInterval(refreshBooks, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   // Expiry Checker: checks and transitions expired books to 'Unsold by Admin'
   useEffect(() => {
     const checkExpirations = () => {
@@ -328,9 +346,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           createdDate: item.created_at || '',
           soldDate: item.sold_at || item.sold_date || '',
           unsoldDate: item.unsold_at || item.unsold_date || '',
-          status: String(item.status || 'Assigned').toLowerCase() === 'sold' ? 'Sold' :
-            String(item.status || '').toLowerCase() === 'unsold' ? 'Unsold' :
-              String(item.status || '').toLowerCase() === 'unsold by admin' ? 'Unsold by Admin' : 'Assigned'
+          status: normalizeBookStatus(item.status)
         };
       });
 
