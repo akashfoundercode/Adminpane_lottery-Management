@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Agent, Book, Game, Winning, Ticket, ListPagination } from '../types';
+import { apiUrl } from '../config/api';
 
 interface AgentContextType {
   isAuthenticated: boolean;
@@ -312,7 +313,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const fetchAgentBooks = async (limit = 10, offset = 0, append = false) => {
     const token = localStorage.getItem('agent_token');
     try {
-      const response = await fetch(`/api/v1/agent/books?limit=${limit}&offset=${offset}`, {
+      const response = await fetch(apiUrl(`/api/v1/agent/books?limit=${limit}&offset=${offset}`), {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -384,7 +385,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const token = localStorage.getItem('agent_token');
-    const response = await fetch(`/api/v1/agent/books/${status.toLowerCase()}`, {
+    const response = await fetch(apiUrl(`/api/v1/agent/books/${status.toLowerCase()}`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

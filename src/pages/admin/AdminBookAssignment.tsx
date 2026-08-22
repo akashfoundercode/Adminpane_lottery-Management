@@ -3,6 +3,7 @@ import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { UserCheck, ShieldAlert, XCircle, Search, Calendar, CheckSquare, Square } from 'lucide-react';
 import { Book } from '../../types';
+import { apiUrl } from '../../config/api';
 
 export const AdminBookAssignment: React.FC = () => {
   const { games, books, agents, assignBooks, revokeAssignment } = useAdmin();
@@ -24,7 +25,7 @@ export const AdminBookAssignment: React.FC = () => {
     if (!selectedGameId) { setAvailableBooks([]); return; }
     const token = localStorage.getItem('admin_token') || '';
     setLoadingBooks(true);
-    fetch(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=200`, {
+    fetch(apiUrl(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=200`), {
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
     })
       .then(r => r.json())

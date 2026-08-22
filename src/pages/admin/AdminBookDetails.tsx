@@ -4,6 +4,7 @@ import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { ArrowLeft, HelpCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { apiUrl } from '../../config/api';
 
 export const AdminBookDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +25,7 @@ export const AdminBookDetails: React.FC = () => {
   useEffect(() => {
     if (!book?.agentId) return;
     const token = localStorage.getItem('admin_token');
-    fetch(`/api/v1/admin/book-assignments/history?limit=100`, {
+    fetch(apiUrl(`/api/v1/admin/book-assignments/history?limit=100`), {
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
     })
       .then(r => r.json())
@@ -40,7 +41,7 @@ export const AdminBookDetails: React.FC = () => {
           });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [book?.agentId, book?.apiId, book?.bookNumber]);
 
   const handleStatusUpdate = async () => {
@@ -117,10 +118,10 @@ export const AdminBookDetails: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-text-secondary">Current Status</span>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${book.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                    book.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                      book.status === 'Assigned' || book.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
-                        book.status === 'Unsold' ? 'bg-amber-100 text-amber-800' :
-                          'bg-rose-100 text-rose-800'
+                  book.status === 'Available' ? 'bg-blue-100 text-blue-800' :
+                    book.status === 'Assigned' || book.status === 'In Progress' ? 'bg-purple-100 text-purple-800' :
+                      book.status === 'Unsold' ? 'bg-amber-100 text-amber-800' :
+                        'bg-rose-100 text-rose-800'
                   }`}>
                   {book.status}
                 </span>
@@ -177,9 +178,9 @@ export const AdminBookDetails: React.FC = () => {
                     <span className="font-mono font-bold text-text-primary">{ticketNo}</span>
                   </div>
                   <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${tStatus === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                      tStatus === 'Assigned' ? 'bg-purple-100 text-purple-800' :
-                        tStatus === 'Unsold' ? 'bg-amber-100 text-amber-800' :
-                          'bg-blue-100 text-blue-800'
+                    tStatus === 'Assigned' ? 'bg-purple-100 text-purple-800' :
+                      tStatus === 'Unsold' ? 'bg-amber-100 text-amber-800' :
+                        'bg-blue-100 text-blue-800'
                     }`}>
                     {tStatus}
                   </span>

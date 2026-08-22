@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { ArrowLeft, Calendar, Layers, AlertCircle, Trash2 } from 'lucide-react';
 import type { Book } from '../../types';
+import { apiUrl } from '../../config/api';
 
 export const AdminGameDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,7 +21,7 @@ export const AdminGameDetails: React.FC = () => {
     setBooksLoading(true);
     const token = localStorage.getItem('admin_token') || '';
     try {
-      const res = await fetch(`/api/v1/admin/books?page=${page}&limit=50&game_id=${game.id}`, {
+      const res = await fetch(apiUrl(`/api/v1/admin/books?page=${page}&limit=50&game_id=${game.id}`), {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
       const json = await res.json();
@@ -239,9 +240,9 @@ export const AdminGameDetails: React.FC = () => {
                       <td className="py-2 px-3 font-mono font-medium text-text-secondary">{b.serialNumber}</td>
                       <td className="py-2 px-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${b.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                            b.status === 'Assigned' ? 'bg-purple-100 text-purple-800' :
-                              b.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                                'bg-amber-100 text-amber-800'
+                          b.status === 'Assigned' ? 'bg-purple-100 text-purple-800' :
+                            b.status === 'Available' ? 'bg-blue-100 text-blue-800' :
+                              'bg-amber-100 text-amber-800'
                           }`}>
                           {b.status}
                         </span>

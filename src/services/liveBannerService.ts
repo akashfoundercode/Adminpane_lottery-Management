@@ -1,4 +1,5 @@
 import { LiveBannerSettings } from '../types';
+import { apiUrl } from '../config/api';
 
 const readPayload = (json: any): LiveBannerSettings => {
     const first = json?.data && !Array.isArray(json.data) ? json.data : json;
@@ -12,7 +13,7 @@ const readPayload = (json: any): LiveBannerSettings => {
 };
 
 export const getPublicLiveBanners = async (gameId: string): Promise<LiveBannerSettings> => {
-    const response = await fetch(`http://127.0.0.1:8000/user/games/${gameId}/live-banners`);
+    const response = await fetch(apiUrl(`/user/games/${gameId}/live-banners`));
     const json = await response.json();
     if (!response.ok || json?.success === false) throw new Error(json?.message || 'Failed to fetch live banners.');
     return readPayload(json);

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination, ContactSettings, LiveBannerSettings } from '../types';
+import { apiUrl } from '../config/api';
 
 
 interface AdminContextType {
@@ -490,7 +491,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     setLoadingGames(true);
     try {
-      const response = await fetch(`/api/v1/admin/games?limit=${limit}&offset=${offset}`, {
+      const response = await fetch(apiUrl(`/api/v1/admin/games?limit=${limit}&offset=${offset}`), {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -551,7 +552,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     setLoadingBooks(true);
     try {
-      const response = await fetch(`/api/v1/admin/books?page=${page}&limit=${limit}`, {
+      const response = await fetch(apiUrl(`/api/v1/admin/books?page=${page}&limit=${limit}`), {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -642,7 +643,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     setLoadingAgents(true);
     try {
-      const response = await fetch(`/api/v1/admin/agents?limit=${limit}&offset=${offset}`, {
+      const response = await fetch(apiUrl(`/api/v1/admin/agents?limit=${limit}&offset=${offset}`), {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -692,7 +693,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setLoadingHistory(true);
     try {
       const gameParam = gameId ? `&game_id=${gameId}` : '';
-      const response = await fetch(`/api/v1/admin/book-assignments/history?limit=${limit}&offset=${offset}${gameParam}`, {
+      const response = await fetch(apiUrl(`/api/v1/admin/book-assignments/history?limit=${limit}&offset=${offset}${gameParam}`), {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -834,7 +835,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     setLoadingResults(true);
     try {
-      const response = await fetch(`/api/v1/admin/results?limit=${limit}&offset=${offset}`, {
+      const response = await fetch(apiUrl(`/api/v1/admin/results?limit=${limit}&offset=${offset}`), {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -864,7 +865,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const fetchResult = async (id: string): Promise<Result | null> => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
-    const response = await fetch(`/api/v1/admin/results/${id}`, {
+    const response = await fetch(apiUrl(`/api/v1/admin/results/${id}`), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
     });
 
@@ -894,7 +895,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const fetchContactSettings = async () => {
     const token = localStorage.getItem('admin_token') || '';
     try {
-      const response = await fetch('/api/v1/admin/contact-settings', {
+      const response = await fetch(apiUrl('/api/v1/admin/contact-settings'), {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Failed to fetch contact settings.');
@@ -923,8 +924,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const fetchLiveBanners = async (gameId: string): Promise<LiveBannerSettings> => {
     const token = localStorage.getItem('admin_token') || '';
     const paths = [
-      `http://127.0.0.1:8000/api/v1/admin/games/${gameId}/live-banners`,
-      `http://127.0.0.1:8000/api/v1/games/${gameId}/live-banners`
+      apiUrl(`/api/v1/admin/games/${gameId}/live-banners`),
+      apiUrl(`/api/v1/games/${gameId}/live-banners`)
     ];
     let response = await fetch(paths[0], {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
@@ -945,8 +946,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const saveLiveBanners = async (gameId: string, settings: { youtube_live_url: string; facebook_live_url: string; banners: File[]; existing_banners?: string[] }): Promise<LiveBannerSettings> => {
     const token = localStorage.getItem('admin_token') || '';
     const paths = [
-      `http://127.0.0.1:8000/api/v1/admin/games/${gameId}/live-banners`,
-      `http://127.0.0.1:8000/api/v1/games/${gameId}/live-banners`
+      apiUrl(`/api/v1/admin/games/${gameId}/live-banners`),
+      apiUrl(`/api/v1/games/${gameId}/live-banners`)
     ];
     const request = (path: string, method: 'PUT' | 'POST') => {
       const formData = new FormData();
@@ -974,7 +975,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteLiveBanner = async (gameId: string, bannerId: number | string): Promise<void> => {
     const token = localStorage.getItem('admin_token') || '';
-    const response = await fetch(`http://127.0.0.1:8000/api/v1/admin/games/${gameId}/live-banners/${bannerId}`, {
+    const response = await fetch(apiUrl(`/api/v1/admin/games/${gameId}/live-banners/${bannerId}`), {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -987,7 +988,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const saveContactSettings = async (settings: ContactSettings) => {
     const token = localStorage.getItem('admin_token') || '';
-    const request = (method: 'PUT' | 'POST') => fetch('/api/v1/admin/contact-settings', {
+    const request = (method: 'PUT' | 'POST') => fetch(apiUrl('/api/v1/admin/contact-settings'), {
       method,
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify(settings)
@@ -1030,7 +1031,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch('/api/v1/admin/login', {
+      const response = await fetch(apiUrl('/api/v1/admin/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1073,7 +1074,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const token = localStorage.getItem('admin_token');
     try {
       if (token) {
-        await fetch('/api/v1/admin/logout', {
+        await fetch(apiUrl('/api/v1/admin/logout'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1118,7 +1119,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         formData.append('facebook_live_url', gameData.facebookLiveUrl || 'https://facebook.com/live/demo');
         formData.append('status', apiStatus);
 
-        const response = await fetch('/api/v1/admin/games', {
+        const response = await fetch(apiUrl('/api/v1/admin/games'), {
           method: 'POST',
           headers: {
             // Note: DO NOT set 'Content-Type' header here, browser sets it automatically with correct boundary
@@ -1151,7 +1152,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         status: apiStatus
       };
 
-      const response = await fetch('/api/v1/admin/games', {
+      const response = await fetch(apiUrl('/api/v1/admin/games'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1194,7 +1195,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (updatedGame.status) formData.append('status', apiStatus);
         formData.append('_method', 'PUT');
 
-        const res = await fetch(`/api/v1/admin/games/${id}`, {
+        const res = await fetch(apiUrl(`/api/v1/admin/games/${id}`), {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: formData
@@ -1214,7 +1215,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (updatedGame.facebookLiveUrl !== undefined) payload.facebook_live_url = updatedGame.facebookLiveUrl;
         if (updatedGame.status !== undefined) payload.status = apiStatus;
 
-        const res = await fetch(`/api/v1/admin/games/${id}`, {
+        const res = await fetch(apiUrl(`/api/v1/admin/games/${id}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify(payload)
@@ -1323,7 +1324,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     formData.append('books_file', file);
 
     try {
-      const response = await fetch('/api/v1/admin/books/import', {
+      const response = await fetch(apiUrl('/api/v1/admin/books/import'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1382,7 +1383,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     try {
-      const response = await fetch('/api/v1/admin/book-assignments', {
+      const response = await fetch(apiUrl('/api/v1/admin/book-assignments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1451,7 +1452,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const token = localStorage.getItem('admin_token');
-    const response = await fetch('/api/v1/admin/books/update-status', {
+    const response = await fetch(apiUrl('/api/v1/admin/books/update-status'), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -1504,7 +1505,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     try {
-      const response = await fetch('/api/v1/admin/agents', {
+      const response = await fetch(apiUrl('/api/v1/admin/agents'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1612,7 +1613,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const formData = buildResultFormData(resultData, prizes, false);
 
     try {
-      const response = await fetch('/api/v1/admin/results', {
+      const response = await fetch(apiUrl('/api/v1/admin/results'), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -1633,7 +1634,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const formData = buildResultFormData(updatedResult, prizes, false);
     formData.append('_method', 'PUT');
     try {
-      const response = await fetch(`/api/v1/admin/results/${id}`, {
+      const response = await fetch(apiUrl(`/api/v1/admin/results/${id}`), {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -1668,7 +1669,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteResult = async (id: string) => {
     const token = localStorage.getItem('admin_token') || '';
     try {
-      const res = await fetch(`/api/v1/admin/results/${id}`, {
+      const res = await fetch(apiUrl(`/api/v1/admin/results/${id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -1691,7 +1692,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleResultStatus = async (id: string) => {
     const token = localStorage.getItem('admin_token') || '';
     try {
-      const res = await fetch(`/api/v1/admin/results/${id}/toggle-status`, {
+      const res = await fetch(apiUrl(`/api/v1/admin/results/${id}/toggle-status`), {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -1706,7 +1707,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const restoreResult = async (id: string) => {
     const token = localStorage.getItem('admin_token') || '';
     try {
-      const res = await fetch(`/api/v1/admin/results/${id}/restore`, {
+      const res = await fetch(apiUrl(`/api/v1/admin/results/${id}/restore`), {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${token}` }
       });
