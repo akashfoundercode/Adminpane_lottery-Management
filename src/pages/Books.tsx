@@ -2,10 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAgent } from '../context/AgentContext';
 import { Book } from '../types';
-import { Search, Filter, ArrowUpDown, Eye, BookOpen, AlertTriangle } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, Eye, BookOpen, AlertTriangle, CheckCircle2, XCircle, Lock } from 'lucide-react';
 
 export const Books: React.FC = () => {
-  const { books, games, booksPagination, fetchAgentBooks } = useAgent();
+  const { books, games, booksPagination, fetchAgentBooks, markBookAsSold, markBookAsUnsold } = useAgent();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -21,6 +21,7 @@ export const Books: React.FC = () => {
 
   const itemsPerPage = 50;
   const [offset, setOffset] = useState(0);
+  const [updatingBookId, setUpdatingBookId] = useState<string | null>(null);
 
   // Sync with topbar quick search parameter
   useEffect(() => {
@@ -118,6 +119,16 @@ export const Books: React.FC = () => {
     } else {
       setSortField(field);
       setSortOrder('asc');
+    }
+  };
+
+  const handleStatusUpdate = async (bookId: string, status: 'Sold' | 'Unsold') => {
+    setUpdatingBookId(bookId);
+    try {
+      if (status === 'Sold') await markBookAsSold(bookId);
+      else await markBookAsUnsold(bookId);
+    } finally {
+      setUpdatingBookId(null);
     }
   };
 
@@ -268,18 +279,21 @@ export const Books: React.FC = () => {
                       })}
                     </td>
                     <td className="p-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(book.status)}`}>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(book.status)}`}>
+                        {book.status === 'Unsold by Admin' && <Lock className="w-3 h-3" />}
                         {book.status}
                       </span>
                     </td>
                     <td className="p-4 text-right">
-                      <button
-                        onClick={() => navigate(`/agent/books/${book.id}`)}
-                        className="px-3.5 py-1.5 text-xs font-bold text-brand-emerald hover:text-brand-emerald-hover bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1.5"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {(book.status === 'Assigned' || book.status === 'In Progress') && (
+                          <>
+                            <button onClick={() => handleStatusUpdate(book.id, 'Sold')} disabled={updatingBookId === book.id} className="px-2.5 py-1.5 text-[10px] font-bold text-white bg-brand-emerald hover:bg-brand-emerald-hover rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">Sold</button>
+                            <button onClick={() => handleStatusUpdate(book.id, 'Unsold')} disabled={updatingBookId === book.id} className="px-2.5 py-1.5 text-[10px] font-bold text-warning-main bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">Unsold</button>
+                          </>
+                        )}
+                        <button onClick={() => navigate(`/agent/books/${book.id}`)} className="px-3.5 py-1.5 text-xs font-bold text-brand-emerald hover:text-brand-emerald-hover bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer transition-colors inline-flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -301,6 +315,7 @@ export const Books: React.FC = () => {
               <div className="flex justify-between items-center">
                 <span className="font-mono font-bold text-sm text-text-primary">{book.id}</span>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(book.status)}`}>
+                  {book.status === 'Unsold by Admin' && <Lock className="w-3 h-3 mr-1" />}
                   {book.status}
                 </span>
               </div>
@@ -326,13 +341,15 @@ export const Books: React.FC = () => {
                 <p>Expiry: {new Date(book.expiryDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
               </div>
 
-              <button
-                onClick={() => navigate(`/agent/books/${book.id}`)}
-                className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-brand-emerald hover:text-brand-emerald-hover text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>View Details</span>
-              </button>
+              <div className="flex gap-2">
+                {(book.status === 'Assigned' || book.status === 'In Progress') && (
+                  <>
+                    <button onClick={() => handleStatusUpdate(book.id, 'Sold')} disabled={updatingBookId === book.id} className="flex-1 py-2 bg-brand-emerald text-white text-xs font-semibold rounded-lg disabled:opacity-50">Sold</button>
+                    <button onClick={() => handleStatusUpdate(book.id, 'Unsold')} disabled={updatingBookId === book.id} className="flex-1 py-2 bg-amber-50 text-warning-main border border-amber-200 text-xs font-semibold rounded-lg disabled:opacity-50">Unsold</button>
+                  </>
+                )}
+                <button onClick={() => navigate(`/agent/books/${book.id}`)} className="flex-1 py-2 bg-emerald-50 hover:bg-emerald-100 text-brand-emerald hover:text-brand-emerald-hover text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"><Eye className="w-3.5 h-3.5" /><span>View Details</span></button>
+              </div>
             </div>
           ))
         )}

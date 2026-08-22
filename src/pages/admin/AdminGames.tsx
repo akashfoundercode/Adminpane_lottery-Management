@@ -464,14 +464,6 @@ export const AdminGames: React.FC = () => {
         type="danger"
         confirmText="Delete Game"
       />
-      <button
-        type="button"
-        onClick={() => setBannerGame({ id: game.id, name: game.name })}
-        title="Create Banner"
-        className="text-text-secondary hover:text-indigo-600 transition-colors"
-      >
-        <UploadCloud className="w-3.5 h-3.5" />
-      </button>
 
       {bannerGame && (
         <LiveBannerModal

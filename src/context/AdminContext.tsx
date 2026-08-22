@@ -380,7 +380,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const url = new URL(path);
         const isLocalBackend = ['localhost', '127.0.0.1'].includes(url.hostname);
         if (isLocalBackend && url.pathname.startsWith('/storage/')) {
-          return url.pathname;
+          return apiUrl(`${url.pathname}${url.search}`);
         }
       } catch {
         return path;
@@ -397,7 +397,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       cleanPath = 'storage/' + cleanPath;
     }
 
-    return '/' + cleanPath;
+    return apiUrl('/' + cleanPath);
   };
 
   const [games, setGames] = useState<Game[]>([]);
@@ -1370,10 +1370,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Find numeric database IDs for books
     const numericBookIds = bookIds.map(bId => {
       const bookObj = books.find(b => b.id === bId);
+      if (bookObj && bookObj.apiId !== undefined) return Number(bookObj.apiId);
       if (bookObj && bookObj.bookNumber) return Number(bookObj.bookNumber);
       const digits = bId.replace(/\D/g, '');
       return digits ? Number(digits) : Number(bId);
     });
+
+    if (numericBookIds.some(bookId => !Number.isInteger(bookId) || bookId <= 0)) {
+      throw new Error('Selected book IDs are invalid. Please reload the available books and try again.');
+    }
 
     const payload = {
       game_id: Number(gameId),
@@ -1516,13 +1521,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'Server responded with an error during agent creation.');
+        throw new Error(extractApiErrorMessage(errorText, 'Unable to create agent. Please review the details and try again.'));
       }
 
       await fetchAgents();
     } catch (err: any) {
       console.error('API Error in createAgent:', err);
-      throw new Error(err.message || 'API connection failed. Please check if server is running.');
+      throw new Error(extractApiErrorMessage(err?.message, 'Unable to create agent. Please try again.'));
     }
   };
 

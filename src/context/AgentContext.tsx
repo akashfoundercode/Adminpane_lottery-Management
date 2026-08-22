@@ -323,7 +323,13 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const json = await response.json();
       const payload = json?.data && !Array.isArray(json.data) ? json.data : json;
-      const rawBooks = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
+      const rawBooks = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+            ? payload
+            : [];
       const mappedBooks: Book[] = rawBooks.map((item: any) => {
         const bookId = item.book_id || item.book_number || `BK${item.id}`;
         const ticketCount = Number(item.total_tickets || item.tickets_count || item.book?.total_tickets || 0);
@@ -421,6 +427,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ? { ...item, status, soldDate: updatedAt } as Book
         : { ...item, status, unsoldDate: updatedAt } as Book;
     }));
+    await fetchAgentBooks(50, 0, false);
     return true;
   };
 

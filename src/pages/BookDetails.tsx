@@ -15,7 +15,8 @@ import {
   XCircle,
   AlertTriangle,
   Trophy,
-  Ticket as TicketIcon
+  Ticket as TicketIcon,
+  Lock
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -118,7 +119,8 @@ export const BookDetails: React.FC = () => {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold font-display text-text-primary">Book {book.id}</h2>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(book.status)}`}>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(book.status)}`}>
+              {book.status === 'Unsold by Admin' && <Lock className="w-3 h-3" />}
               {book.status}
             </span>
           </div>

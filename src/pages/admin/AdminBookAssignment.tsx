@@ -83,7 +83,7 @@ export const AdminBookAssignment: React.FC = () => {
     if (selectedBookIds.length === availableBooks.length) {
       setSelectedBookIds([]);
     } else {
-      setSelectedBookIds(availableBooks.map(b => b.id));
+      setSelectedBookIds(availableBooks.map(b => String(b.apiId ?? b.id)));
     }
   };
 
@@ -197,12 +197,13 @@ export const AdminBookAssignment: React.FC = () => {
                     </div>
                   ) : (
                     filteredAvailableBooks.map(b => {
-                      const isSelected = selectedBookIds.includes(b.id);
+                      const selectionId = String(b.apiId ?? b.id);
+                      const isSelected = selectedBookIds.includes(selectionId);
                       return (
                         <button
                           type="button"
                           key={b.id}
-                          onClick={() => handleToggleBook(b.id)}
+                          onClick={() => handleToggleBook(selectionId)}
                           className={`flex items-center gap-2 w-full p-2 rounded-lg text-left text-xs transition-colors border ${isSelected ? 'bg-indigo-50 border-indigo-200 text-indigo-900 font-semibold' : 'bg-white border-slate-100 text-slate-700'
                             }`}
                         >

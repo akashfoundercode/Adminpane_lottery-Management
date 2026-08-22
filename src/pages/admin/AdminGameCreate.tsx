@@ -28,6 +28,8 @@ export const AdminGameCreate: React.FC = () => {
   const [youtubeLiveUrl, setYoutubeLiveUrl] = useState('https://youtube.com/live/demo');
   const [facebookLiveUrl, setFacebookLiveUrl] = useState('https://facebook.com/live/demo');
 
+  const today = new Date().toISOString().split('T')[0];
+
   const generateGameCode = (gameName: string) => {
     const prefix = gameName
       .trim()
@@ -74,8 +76,33 @@ export const AdminGameCreate: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !drawDate) {
-      showToast('Please fill in all required fields.', 'error');
+    if (!name.trim() || !drawDate || !startDate || !endDate) {
+      showToast('Please fill in all required game fields.', 'error');
+      return;
+    }
+    if (startDate < today || endDate < today || drawDate < today) {
+      showToast('Past dates are not allowed. Please select today or a future date.', 'error');
+      return;
+    }
+    if (endDate < startDate) {
+      showToast('Sale end date cannot be before sale start date.', 'error');
+      return;
+    }
+    if (drawDate < endDate) {
+      showToast('Draw date must be on or after the sale end date.', 'error');
+      return;
+    }
+    if (drawDate === today) {
+      const [hours, minutes] = drawTime.split(':').map(Number);
+      const drawDateTime = new Date();
+      drawDateTime.setHours(hours || 0, minutes || 0, 0, 0);
+      if (drawDateTime <= new Date()) {
+        showToast('Past draw time is not allowed for today.', 'error');
+        return;
+      }
+    }
+    if (ticketPrice < 1) {
+      showToast('Ticket Prize must be at least 1.', 'error');
       return;
     }
 
@@ -183,6 +210,7 @@ export const AdminGameCreate: React.FC = () => {
               <input
                 type="date"
                 required
+                min={today}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary"
@@ -197,6 +225,7 @@ export const AdminGameCreate: React.FC = () => {
               <input
                 type="date"
                 required
+                min={startDate || today}
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary"
@@ -211,6 +240,7 @@ export const AdminGameCreate: React.FC = () => {
               <input
                 type="date"
                 required
+                min={today}
                 value={drawDate}
                 onChange={(e) => setDrawDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary"
@@ -225,6 +255,7 @@ export const AdminGameCreate: React.FC = () => {
               <input
                 type="time"
                 value={drawTime}
+                min={drawDate === today ? new Date().toTimeString().slice(0, 5) : undefined}
                 onChange={(e) => setDrawTime(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary"
               />
