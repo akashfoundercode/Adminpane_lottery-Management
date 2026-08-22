@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination, ContactSettings, LiveBannerSettings } from '../types';
 import { apiUrl } from '../config/api';
 
+type AgentUpdate = Partial<Agent> & { password?: string };
 
 interface AdminContextType {
   // Auth
@@ -49,7 +50,7 @@ interface AdminContextType {
   updateBookStatus: (bookId: string, status: 'Sold' | 'Unsold') => Promise<void>;
 
   createAgent: (agent: Omit<Agent, 'id' | 'agentId'> & { password: string }) => Promise<void>;
-  updateAgent: (id: string, updatedAgent: Partial<Agent>) => Promise<void>;
+  updateAgent: (id: string, updatedAgent: AgentUpdate) => Promise<void>;
   toggleAgentStatus: (id: string) => void;
 
   createPrize: (prize: Omit<Prize, 'id'>) => void;
@@ -378,8 +379,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (path.startsWith('http://') || path.startsWith('https://')) {
       try {
         const url = new URL(path);
-        const isLocalBackend = ['localhost', '127.0.0.1'].includes(url.hostname);
-        if (isLocalBackend && url.pathname.startsWith('/storage/')) {
+        if (url.pathname.startsWith('/storage/')) {
           return apiUrl(`${url.pathname}${url.search}`);
         }
       } catch {
@@ -1531,7 +1531,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const updateAgent = async (id: string, updatedAgent: Partial<Agent>) => {
+  const updateAgent = async (id: string, updatedAgent: AgentUpdate) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     const payload: Record<string, string> = {};
 
@@ -1543,7 +1543,6 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (updatedAgent.agentType !== undefined) payload.agent_type = updatedAgent.agentType === 'First Party' ? 'first_party' : 'third_party';
     if (updatedAgent.status !== undefined) payload.status = updatedAgent.status === 'Active' ? 'active' : 'inactive';
     if (updatedAgent.password) payload.password = updatedAgent.password;
-
     const response = await fetch(apiUrl(`/api/v1/admin/agents/${encodeURIComponent(id)}`), {
       method: 'PUT',
       headers: {
