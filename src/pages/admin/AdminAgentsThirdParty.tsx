@@ -101,9 +101,9 @@ export const AdminAgentsThirdParty: React.FC = () => {
     setIsEditOpen(true);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !mobile.trim() || !whatsapp.trim() || !address.trim() || !password.trim()) {
+    if (!name.trim() || !email.trim() || !mobile.trim() || !whatsapp.trim() || !address.trim()) {
       showToast('Please complete all agent fields.', 'error');
       return;
     }
@@ -111,23 +111,27 @@ export const AdminAgentsThirdParty: React.FC = () => {
       showToast('Please enter valid email, mobile and WhatsApp details.', 'error');
       return;
     }
-    if (password.length < 6) {
+    if (password && password.length < 6) {
       showToast('Password must be at least 6 characters.', 'error');
       return;
     }
     if (selectedAgent) {
-      updateAgent(selectedAgent.id, {
-        name,
-        email,
-        mobile,
-        whatsapp,
-        address,
-        password,
-        status
-      });
-      showToast('Agent details updated.', 'success');
-      setIsEditOpen(false);
-      setSelectedAgent(null);
+      try {
+        await updateAgent(selectedAgent.id, {
+          name,
+          email,
+          mobile,
+          whatsapp,
+          address,
+          ...(password ? { password } : {}),
+          status
+        });
+        showToast('Agent details updated.', 'success');
+        setIsEditOpen(false);
+        setSelectedAgent(null);
+      } catch (err: any) {
+        showToast(err.message || 'Failed to update agent.', 'error');
+      }
     }
   };
 
@@ -391,8 +395,8 @@ export const AdminAgentsThirdParty: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Password *</label>
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Password (optional)</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave blank to keep current password" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Status *</label>

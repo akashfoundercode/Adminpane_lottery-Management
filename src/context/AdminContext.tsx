@@ -49,7 +49,7 @@ interface AdminContextType {
   updateBookStatus: (bookId: string, status: 'Sold' | 'Unsold') => Promise<void>;
 
   createAgent: (agent: Omit<Agent, 'id' | 'agentId'> & { password: string }) => Promise<void>;
-  updateAgent: (id: string, updatedAgent: Partial<Agent>) => void;
+  updateAgent: (id: string, updatedAgent: Partial<Agent>) => Promise<void>;
   toggleAgentStatus: (id: string) => void;
 
   createPrize: (prize: Omit<Prize, 'id'>) => void;
@@ -1531,8 +1531,34 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const updateAgent = (id: string, updatedAgent: Partial<Agent>) => {
-    setAgents(prev => prev.map(a => a.id === id ? { ...a, ...updatedAgent } : a));
+  const updateAgent = async (id: string, updatedAgent: Partial<Agent>) => {
+    const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    const payload: Record<string, string> = {};
+
+    if (updatedAgent.name !== undefined) payload.agent_name = updatedAgent.name;
+    if (updatedAgent.email !== undefined) payload.email = updatedAgent.email;
+    if (updatedAgent.mobile !== undefined) payload.mobile_number = updatedAgent.mobile;
+    if (updatedAgent.whatsapp !== undefined) payload.whatsapp_number = updatedAgent.whatsapp;
+    if (updatedAgent.address !== undefined) payload.address = updatedAgent.address;
+    if (updatedAgent.agentType !== undefined) payload.agent_type = updatedAgent.agentType === 'First Party' ? 'first_party' : 'third_party';
+    if (updatedAgent.status !== undefined) payload.status = updatedAgent.status === 'Active' ? 'active' : 'inactive';
+    if (updatedAgent.password) payload.password = updatedAgent.password;
+
+    const response = await fetch(apiUrl(`/api/v1/admin/agents/${encodeURIComponent(id)}`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(extractApiErrorMessage(errorText, 'Unable to update agent. Please review the details and try again.'));
+    }
+
+    await fetchAgents();
   };
 
   const toggleAgentStatus = (id: string) => {
