@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../context/ToastContext';
 import { ArrowLeft, Calendar, Layers, AlertCircle, Trash2, Lock, RefreshCw } from 'lucide-react';
 import type { Book } from '../../types';
 import { apiUrl } from '../../config/api';
@@ -8,6 +9,7 @@ import { apiUrl } from '../../config/api';
 export const AdminGameDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { games, deleteGame, fetchGameLockStatus, unlockBookByAdmin } = useAdmin();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const game = games.find(g => g.id === id);
@@ -108,8 +110,10 @@ export const AdminGameDetails: React.FC = () => {
     try {
       await unlockBookByAdmin(book.apiId ?? book.id);
       setGameBooks(prev => prev.map(item => item.id === book.id ? { ...item, status: 'Unsold by Admin' } : item));
+      showToast(`Book ${book.id} marked as Unsold by Admin.`, 'success');
     } catch (error) {
       console.error('Failed to mark book as unsold by admin:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to mark book as Unsold by Admin.', 'error');
     } finally {
       setUnlockingBookId(null);
     }
@@ -154,7 +158,7 @@ export const AdminGameDetails: React.FC = () => {
         <div className="flex items-center gap-2">
           <Lock className={`w-4 h-4 ${lockStatus?.is_locked ? 'text-rose-600' : 'text-sky-600'}`} />
           <div>
-            <p className="font-bold text-text-primary">{lockStatus?.is_locked ? 'Book lock is active' : 'Book lock window is open'}</p>
+            <p className="font-bold text-text-primary">{lockStatusLoading && !lockStatus ? 'Checking book lock...' : lockStatus?.is_locked ? 'Book lock is active' : 'Book lock window is open'}</p>
             <p className="text-[11px] text-text-secondary">
               {lockStatus?.is_locked ? 'Uncompleted assigned books can be marked Unsold by Admin.' : `${lockStatus?.remaining_minutes ?? '-'} minutes remaining`}
             </p>
