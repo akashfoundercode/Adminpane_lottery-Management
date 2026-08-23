@@ -228,11 +228,16 @@ export const AdminGames: React.FC = () => {
     setIsDeleteOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (selectedGameId) {
-      deleteGame(selectedGameId);
-      showToast('Game deleted successfully.', 'success');
-      setSelectedGameId(null);
+      try {
+        await deleteGame(selectedGameId);
+        showToast('Game deleted successfully.', 'success');
+        setSelectedGameId(null);
+        setIsDeleteOpen(false);
+      } catch (err: any) {
+        showToast(err.message || 'Failed to delete game.', 'error');
+      }
     }
   };
 

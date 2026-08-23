@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { ArrowLeft, Save, Upload } from 'lucide-react';
+import { ArrowLeft, Save, Upload, Trophy, Ticket, Image as ImageIcon, Info, Trash2 } from 'lucide-react';
+import { GamePrize } from '../../types';
 
 export const AdminGameCreate: React.FC = () => {
   const { createGame, updateGame, games } = useAdmin();
@@ -27,6 +28,7 @@ export const AdminGameCreate: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [youtubeLiveUrl, setYoutubeLiveUrl] = useState('https://youtube.com/live/demo');
   const [facebookLiveUrl, setFacebookLiveUrl] = useState('https://facebook.com/live/demo');
+  const [prizes, setPrizes] = useState<GamePrize[]>([]);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -58,6 +60,7 @@ export const AdminGameCreate: React.FC = () => {
       setImage(editGame.image || '');
       setYoutubeLiveUrl(editGame.youtubeLiveUrl || 'https://youtube.com/live/demo');
       setFacebookLiveUrl(editGame.facebookLiveUrl || 'https://facebook.com/live/demo');
+      setPrizes(editGame.prizes || []);
     }
   }, [editId, games.length]);
 
@@ -72,6 +75,16 @@ export const AdminGameCreate: React.FC = () => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handlePrizeImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setPrizes(prev => prev.map((prize, itemIndex) => itemIndex === index
+      ? { ...prize, imageFile: file, image: reader.result as string }
+      : prize));
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -105,8 +118,23 @@ export const AdminGameCreate: React.FC = () => {
       showToast('Ticket Prize must be at least 1.', 'error');
       return;
     }
+    if (!editId && !imageFile) {
+      showToast('Game Image: Please upload a JPG, JPEG, PNG, or WEBP image.', 'error');
+      return;
+    }
 
     const normalizedGameCode = (gameCode || generateGameCode(name)).toUpperCase();
+    const normalizedPrizes = prizes.filter(prize => prize.prizeName.trim()).map((prize, index) => ({
+      ...prize,
+      rank: Number(prize.rank) || index + 1,
+      prizeName: prize.prizeName.trim()
+    }));
+
+    const prizeWithoutImage = normalizedPrizes.findIndex(prize => !prize.imageFile && !prize.image);
+    if (prizeWithoutImage !== -1) {
+      showToast(`Prize ${prizeWithoutImage + 1} Image: Please upload a prize image.`, 'error');
+      return;
+    }
 
     try {
       if (editId && editGame) {
@@ -124,7 +152,8 @@ export const AdminGameCreate: React.FC = () => {
           image: image || editGame.image || 'game1.png',
           imageFile: imageFile || undefined,
           youtubeLiveUrl,
-          facebookLiveUrl
+          facebookLiveUrl,
+          prizes: normalizedPrizes
         });
         showToast('Game updated successfully!', 'success');
       } else {
@@ -143,7 +172,8 @@ export const AdminGameCreate: React.FC = () => {
           image: image || 'game1.png',
           imageFile: imageFile || undefined,
           youtubeLiveUrl,
-          facebookLiveUrl
+          facebookLiveUrl,
+          prizes: normalizedPrizes
         });
         showToast('Game created successfully!', 'success');
       }
@@ -154,8 +184,8 @@ export const AdminGameCreate: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-sans max-w-3xl mx-auto">
-      <div className="flex items-center gap-3">
+    <div className="space-y-6 font-sans max-w-7xl mx-auto pb-6">
+      <div className="flex items-center gap-3 px-1">
         <Link
           to="/admin/games"
           className="p-2 rounded-lg bg-white border border-border-light hover:bg-slate-50 transition-colors text-text-secondary hover:text-text-primary"
@@ -164,15 +194,22 @@ export const AdminGameCreate: React.FC = () => {
         </Link>
         <div>
           <h2 className="text-[20px] font-bold text-text-primary font-display">{editGame ? 'Edit Game' : 'Create New Game'}</h2>
-          <p className="text-xs text-text-secondary">{editGame ? `Editing: ${editGame.name}` : 'Add a new lottery draw with specifications'}</p>
+          <p className="text-xs text-text-secondary">{editGame ? `Editing: ${editGame.name}` : 'Configure your lottery draw details and prizes'}</p>
         </div>
       </div>
 
-      <div className="bg-white border border-border-light rounded-xl shadow-sm overflow-hidden p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="bg-transparent">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div
+            className="relative md:min-h-[var(--prize-panel-height)] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)] gap-4 lg:gap-5 items-start bg-white border border-border-light rounded-2xl shadow-sm p-4 sm:p-5"
+            style={{ '--prize-panel-height': `${Math.max(760, 190 + prizes.length * 122)}px` } as React.CSSProperties}
+          >
             {/* Game Name */}
-            <div className="md:col-span-2">
+            <div className="md:col-span-1 md:col-start-1 lg:col-span-1 lg:col-start-1">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="h-9 w-9 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center"><Info className="w-4 h-4" /></span>
+                <div><h3 className="text-sm font-bold text-violet-700">Basic Information</h3><p className="text-[10px] text-text-secondary mt-0.5">Enter the basic details for your lottery game</p></div>
+              </div>
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Game Name <span className="text-rose-500">*</span>
               </label>
@@ -187,7 +224,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* Ticket Price */}
-            <div>
+            <div className="md:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Ticket Prize <span className="text-rose-500">*</span>
               </label>
@@ -203,7 +240,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* Start Date */}
-            <div>
+            <div className="md:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Sale Start Date <span className="text-rose-500">*</span>
               </label>
@@ -218,7 +255,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* End Date */}
-            <div>
+            <div className="md:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Sale End Date <span className="text-rose-500">*</span>
               </label>
@@ -233,7 +270,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* Draw Date */}
-            <div>
+            <div className="md:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Draw Date <span className="text-rose-500">*</span>
               </label>
@@ -248,7 +285,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* Draw Time */}
-            <div>
+            <div className="md:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Draw Time
               </label>
@@ -261,8 +298,56 @@ export const AdminGameCreate: React.FC = () => {
               />
             </div>
 
+            {/* Game Prizes */}
+            <div className="md:absolute md:top-4 md:left-1/2 md:right-4 lg:left-[40%] bg-white border border-border-light rounded-2xl shadow-sm p-4 sm:p-5 min-w-0">
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-5">
+                <div className="flex items-center gap-3">
+                  <span className="h-9 w-9 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center"><Trophy className="w-4 h-4" /></span>
+                  <div><h3 className="text-sm font-bold text-violet-700">Game Prizes</h3><p className="text-[10px] text-text-secondary mt-0.5">Add prizes awarded by book or ticket number</p></div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => setPrizes(prev => [...prev, { rank: prev.filter(prize => prize.prizeType === 'book_winner').length + 1, prizeName: '', prizeType: 'book_winner' }])} className="inline-flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white px-3 py-2 rounded-lg text-[11px] font-semibold whitespace-nowrap"><Trophy className="w-3.5 h-3.5" /> Add Book Prize</button>
+                  <button type="button" onClick={() => setPrizes(prev => [...prev, { rank: prev.filter(prize => prize.prizeType === 'ticket_winner').length + 1, prizeName: '', prizeType: 'ticket_winner' }])} className="inline-flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white px-3 py-2 rounded-lg text-[11px] font-semibold whitespace-nowrap"><Ticket className="w-3.5 h-3.5" /> Add Ticket Prize</button>
+                </div>
+              </div>
+              {prizes.length === 0 ? (
+                <p className="text-xs text-text-secondary bg-slate-50 border border-slate-200 rounded-xl px-3 py-3">No prizes added yet.</p>
+              ) : (
+                <div className="space-y-3 md:max-h-[540px] md:overflow-y-auto md:pr-2">
+                  {prizes.map((prize, index) => (
+                    <div key={prize.id || index} className="grid grid-cols-1 sm:grid-cols-[72px_1fr_1fr_1fr_auto] gap-3 items-end bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <label className="text-[10px] font-semibold text-text-secondary uppercase">
+                        Rank
+                        <input type="number" min="1" value={prize.rank} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, rank: Number(e.target.value) } : item))} className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary" />
+                      </label>
+                      <label className="text-[10px] font-semibold text-text-secondary uppercase">
+                        Prize Name
+                        <input type="text" value={prize.prizeName} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, prizeName: e.target.value } : item))} placeholder="First Prize" className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary" />
+                      </label>
+                      <label className="text-[10px] font-semibold text-text-secondary uppercase">
+                        Prize Type
+                        <select value={prize.prizeType} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, prizeType: e.target.value as GamePrize['prizeType'] } : item))} className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary">
+                          <option value="book_winner">Book Winner</option>
+                          <option value="ticket_winner">Ticket Winner</option>
+                        </select>
+                      </label>
+                      <div className="text-[10px] font-semibold text-text-secondary uppercase">
+                        Prize Image
+                        <label className="mt-1 flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-2 cursor-pointer text-[10px] text-text-secondary">
+                          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handlePrizeImageChange(index, e)} className="sr-only" />
+                          <ImageIcon className="w-3.5 h-3.5 text-violet-500" /> {prize.imageFile ? prize.imageFile.name : prize.image ? 'Current image' : 'Choose image'}
+                        </label>
+                        {prize.image && <img src={prize.image} alt="Prize preview" className="mt-2 h-12 w-12 object-cover rounded-lg border border-slate-200" />}
+                      </div>
+                      <button type="button" aria-label="Remove prize" onClick={() => setPrizes(prev => prev.filter((_, itemIndex) => itemIndex !== index))} className="p-2 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Description */}
-            <div className="md:col-span-2">
+            <div className="md:col-span-1 md:col-start-1 lg:col-span-1 lg:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Description
               </label>
@@ -276,7 +361,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* Game Image */}
-            <div className="md:col-span-2">
+            <div className="md:col-span-1 md:col-start-1 lg:col-span-1 lg:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Game Image / Banner
               </label>
@@ -304,7 +389,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* YouTube Live URL */}
-            <div>
+            <div className="md:col-start-1 lg:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 YouTube Live Stream URL
               </label>
@@ -318,7 +403,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* Facebook Live URL */}
-            <div>
+            <div className="md:col-start-1 lg:col-start-1">
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Facebook Live Stream URL
               </label>

@@ -15,6 +15,17 @@ export interface Game {
   imageFile?: any;
   youtubeLiveUrl?: string;
   facebookLiveUrl?: string;
+  prizes?: GamePrize[];
+}
+
+export interface GamePrize {
+  id?: number | string;
+  rank: number;
+  prizeName: string;
+  prizeType: 'book_winner' | 'ticket_winner';
+  prizeAmount?: number;
+  image?: string;
+  imageFile?: File;
 }
 
 export interface Agent {

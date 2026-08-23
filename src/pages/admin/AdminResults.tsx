@@ -11,17 +11,6 @@ import { PageLoader } from '../../components/PageLoader';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ResultPrizeRow {
-  rank: number;
-  prize_name: string;
-  book_prize_amount: string;
-  ticket_prize_amount: string;
-  prize_image: File | null;
-  prize_image_preview: string;
-}
-
-type PrizeCategory = 'book' | 'ticket';
-
 const rankLabel = (r: number) => ['1st', '2nd', '3rd'][r - 1] || `${r}th`;
 
 const formatErrorMessage = (error: unknown, fallback: string) => {
@@ -51,15 +40,6 @@ const formatErrorMessage = (error: unknown, fallback: string) => {
   }
 };
 
-const emptyPrizeRow = (rank: number): ResultPrizeRow => ({
-  rank,
-  prize_name: '',
-  book_prize_amount: '',
-  ticket_prize_amount: '',
-  prize_image: null,
-  prize_image_preview: ''
-});
-
 // ─── Upload / Create Modal ────────────────────────────────────────────────────
 
 const UploadModal: React.FC<{
@@ -70,32 +50,21 @@ const UploadModal: React.FC<{
   const { games, createResult, updateResult } = useAdmin();
   const { showToast } = useToast();
   const isEdit = !!editResult;
-  const existingPrizes = editResult?.prizes || [];
-  const existingBookPrizes = existingPrizes.filter(p =>
-    p.prize_type === 'book_winner' || (!p.prize_type && (p.book_prize_name || Number(p.book_prize_amount) > 0))
-  );
-  const existingTicketPrizes = existingPrizes.filter(p =>
-    p.prize_type === 'ticket_winner' || (!p.prize_type && (p.ticket_prize_name || Number(p.ticket_prize_amount) > 0))
-  );
-
   const [gameId, setGameId] = useState(editResult?.gameId || '');
   const [title, setTitle] = useState(editResult?.title || '');
   const [resultDate, setResultDate] = useState(editResult?.drawDate || '');
   const [resultImage, setResultImage] = useState<File | null>(null);
   const [resultImagePreview, setResultImagePreview] = useState(editResult?.image || '');
-  const [bookPrizes, setBookPrizes] = useState<ResultPrizeRow[]>(
-    existingBookPrizes.length > 0
-      ? existingBookPrizes.map(p => ({ rank: p.rank, prize_name: p.book_prize_name || p.prize_name || '', book_prize_amount: String(p.book_prize_amount || ''), ticket_prize_amount: '', prize_image: null, prize_image_preview: (p as any).prize_image_url || (typeof p.prize_image === 'string' ? p.prize_image : '') }))
-      : [emptyPrizeRow(1)]
-  );
-  const [ticketPrizes, setTicketPrizes] = useState<ResultPrizeRow[]>(
-    existingTicketPrizes.length > 0
-      ? existingTicketPrizes.map(p => ({ rank: p.rank, prize_name: p.ticket_prize_name || p.prize_name || '', book_prize_amount: '', ticket_prize_amount: String(p.ticket_prize_amount || ''), prize_image: null, prize_image_preview: (p as any).prize_image_url || (typeof p.prize_image === 'string' ? p.prize_image : '') }))
-      : [emptyPrizeRow(1)]
-  );
   const [saving, setSaving] = useState(false);
 
   const selectedGame = games.find(g => g.id === gameId);
+  const storedGamePrizes = (selectedGame?.prizes || []).map(prize => ({
+    rank: prize.rank,
+    prize_type: prize.prizeType,
+    prize_name: prize.prizeName,
+    prize_amount: prize.prizeAmount || 0,
+    prize_image: prize.image || null
+  }));
 
   const handleResultImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -105,38 +74,6 @@ const UploadModal: React.FC<{
     reader.onloadend = () => setResultImagePreview(reader.result as string);
     reader.readAsDataURL(file);
   };
-
-  const updateCategoryPrizes = (category: PrizeCategory, updater: (prev: ResultPrizeRow[]) => ResultPrizeRow[]) => {
-    if (category === 'book') {
-      setBookPrizes(updater);
-      return;
-    }
-    setTicketPrizes(updater);
-  };
-
-  const handlePrizeImage = (category: PrizeCategory, idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      updateCategoryPrizes(category, prev => prev.map((p, i) =>
-        i === idx ? { ...p, prize_image: file, prize_image_preview: reader.result as string } : p
-      ));
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const addPrize = (category: PrizeCategory) => updateCategoryPrizes(category, prev => [
-      ...prev,
-      emptyPrizeRow(prev.length + 1)
-    ]);
-
-  const removePrize = (category: PrizeCategory, idx: number) => updateCategoryPrizes(category, prev =>
-    prev.filter((_, i) => i !== idx).map((p, i) => ({ ...p, rank: i + 1 }))
-  );
-
-  const updatePrize = (category: PrizeCategory, idx: number, field: keyof ResultPrizeRow, value: any) =>
-    updateCategoryPrizes(category, prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
 
   const handleSave = async () => {
     if (!gameId || !title || !resultDate) {
@@ -149,52 +86,17 @@ const UploadModal: React.FC<{
     }
     try {
       setSaving(true);
-      const typedPrizes = [
-  ...bookPrizes
-    .filter(
-      p =>
-        p.prize_name ||
-        Number(p.book_prize_amount) > 0 ||
-        p.prize_image ||
-        p.prize_image_preview
-    )
-    .map((p, index) => ({
-      rank: p.rank || index + 1,
-      prize_type: 'book_winner' as const,
-      prize_name:
-        p.prize_name || `${rankLabel(p.rank || index + 1)} Prize`,
-      book_prize_amount: Number(p.book_prize_amount) || 0,
-      prize_image: p.prize_image instanceof File ? p.prize_image : null,
-    })),
-
-  ...ticketPrizes
-    .filter(
-      p =>
-        p.prize_name ||
-        Number(p.ticket_prize_amount) > 0 ||
-        p.prize_image ||
-        p.prize_image_preview
-    )
-    .map((p, index) => ({
-      rank: p.rank || index + 1,
-      prize_type: 'ticket_winner' as const,
-      prize_name:
-        p.prize_name || `${rankLabel(p.rank || index + 1)} Prize`,
-      ticket_prize_amount: Number(p.ticket_prize_amount) || 0,
-      prize_image: p.prize_image instanceof File ? p.prize_image : null,
-    })),
-];
       if (isEdit && editResult) {
         await updateResult(
           editResult.id,
           { gameId, drawDate: resultDate, image: resultImagePreview || '', imageFile: resultImage || undefined, title },
-          typedPrizes
+          storedGamePrizes
         );
         showToast('Result updated successfully.', 'success');
       } else {
         await createResult(
           { gameId, drawDate: resultDate, image: resultImagePreview || '', imageFile: resultImage || undefined, title },
-          typedPrizes
+          storedGamePrizes
         );
         showToast('Result saved successfully.', 'success');
       }
@@ -206,8 +108,12 @@ const UploadModal: React.FC<{
     }
   };
 
-  const renderPrizeCategory = (category: PrizeCategory, rows: ResultPrizeRow[]) => {
+  const renderPrizeCategory = (category: 'book' | 'ticket', rank?: number) => {
     const isBook = category === 'book';
+    const prizes = selectedGame?.prizes?.filter(prize =>
+      prize.prizeType === (isBook ? 'book_winner' : 'ticket_winner') &&
+      (rank === undefined || prize.rank === rank)
+    ) || [];
     return (
       <div className="bg-white border border-border-light rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -215,47 +121,24 @@ const UploadModal: React.FC<{
             <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">
               {isBook ? 'Book Winner Prize' : 'Ticket Winner Prize'}
             </p>
-            <p className="text-[10px] text-text-secondary mt-0.5">
-              Add {rankLabel(1)}, {rankLabel(2)}, {rankLabel(3)}, {rankLabel(4)}, {rankLabel(5)}... prizes
-            </p>
+            <p className="text-[10px] text-text-secondary mt-0.5">Stored prizes for the selected game</p>
           </div>
-          <button
-            onClick={() => addPrize(category)}
-            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-              isBook
-                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
-                : 'bg-sky-50 hover:bg-sky-100 text-sky-700'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" /> Add Rank
-          </button>
         </div>
 
         <div className="space-y-3">
-          {rows.map((prize, idx) => (
-            <div key={`${category}-${idx}`} className="border border-slate-100 bg-slate-50/60 rounded-xl p-3 space-y-3">
+          {prizes.length === 0 ? <p className="text-xs text-text-secondary bg-slate-50 rounded-lg p-3">No stored prize for this rank.</p> : prizes.map((prize, idx) => (
+            <div key={`${category}-${prize.id || idx}`} className="border border-slate-100 bg-slate-50/60 rounded-xl p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold text-text-primary">
                   <Trophy className={`w-3.5 h-3.5 ${isBook ? 'text-emerald-500' : 'text-sky-500'}`} />
-                  {rankLabel(prize.rank)} Prize
+                  {isBook ? 'Book Winner' : 'Ticket Winner'} {rankLabel(prize.rank)}
                 </span>
-                {rows.length > 1 && (
-                  <button onClick={() => removePrize(category, idx)} className="text-slate-400 hover:text-rose-500 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </div>
 
               <div>
                 <div>
                   <label className="block text-[10px] font-semibold text-text-secondary uppercase tracking-wider mb-1">Prize Name</label>
-                  <input
-                    type="text"
-                    value={prize.prize_name}
-                    onChange={e => updatePrize(category, idx, 'prize_name', e.target.value)}
-                    placeholder={isBook ? 'e.g. Book Bumper Prize' : 'e.g. Ticket Bumper Prize'}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-text-primary"
-                  />
+                  <p className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs text-text-primary">{prize.prizeName}</p>
                 </div>
               </div>
 
@@ -276,18 +159,7 @@ const UploadModal: React.FC<{
                 </div>
               )}
 
-              <div>
-                <label className="block text-[10px] font-semibold text-text-secondary uppercase tracking-wider mb-1">Prize Image (optional)</label>
-                <label className="flex items-center gap-2 border border-dashed border-slate-200 hover:border-indigo-300 bg-white rounded-lg px-3 py-2 cursor-pointer transition-colors relative">
-                  <input type="file" accept="image/*" onChange={e => handlePrizeImage(category, idx, e)} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  {prize.prize_image_preview ? (
-                    <img src={prize.prize_image_preview} alt="prize" className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
-                  ) : (
-                    <ImageIcon className="w-4 h-4 text-slate-400" />
-                  )}
-                  <span className="text-[11px] text-text-secondary">{prize.prize_image ? prize.prize_image.name : prize.prize_image_preview ? 'Current image' : 'Upload image'}</span>
-                </label>
-              </div>
+              {prize.image && <img src={prize.image} alt={`${prize.prizeName} prize`} className="h-16 w-16 object-cover rounded-lg border border-slate-200" />}
             </div>
           ))}
         </div>
@@ -309,7 +181,7 @@ const UploadModal: React.FC<{
         </button>
 
         <h2 className="text-[18px] font-bold text-text-primary font-display mb-1">{isEdit ? 'Edit Result' : 'Upload Draw Result'}</h2>
-        <p className="text-xs text-text-secondary mb-6">Fill result details and add separate rank-wise prizes for book winners and ticket winners</p>
+        <p className="text-xs text-text-secondary mb-6">Upload the result board using the stored prizes of the selected game</p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* LEFT — Result Info */}
@@ -403,8 +275,8 @@ const UploadModal: React.FC<{
 
           {/* RIGHT — Prize Rows */}
           <div className="space-y-4 max-h-[560px] overflow-y-auto pr-1">
-            {renderPrizeCategory('book', bookPrizes)}
-            {renderPrizeCategory('ticket', ticketPrizes)}
+            {renderPrizeCategory('book')}
+            {renderPrizeCategory('ticket')}
           </div>
         </div>
 
@@ -543,17 +415,15 @@ export const AdminResults: React.FC = () => {
           <div className="flex gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => selectGameFilter('all')}
-              className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-bold transition-all ${
-                selectedGameId === 'all'
-                  ? 'bg-[#6366f1] text-white border-[#6366f1] shadow-sm'
-                  : 'bg-white text-text-secondary border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700'
-              }`}
+              className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-bold transition-all ${selectedGameId === 'all'
+                ? 'bg-[#6366f1] text-white border-[#6366f1] shadow-sm'
+                : 'bg-white text-text-secondary border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700'
+                }`}
             >
               <Trophy className="w-3.5 h-3.5" />
               <span>All Games</span>
-              <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${
-                selectedGameId === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-text-secondary'
-              }`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${selectedGameId === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-text-secondary'
+                }`}>
                 {results.length}
               </span>
             </button>
@@ -562,18 +432,16 @@ export const AdminResults: React.FC = () => {
               <button
                 key={game.id}
                 onClick={() => selectGameFilter(game.id)}
-                className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-bold transition-all ${
-                  selectedGameId === game.id
-                    ? 'bg-slate-950 text-white border-slate-950 shadow-sm'
-                    : 'bg-white text-text-secondary border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700'
-                }`}
+                className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border text-xs font-bold transition-all ${selectedGameId === game.id
+                  ? 'bg-slate-950 text-white border-slate-950 shadow-sm'
+                  : 'bg-white text-text-secondary border-slate-200 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700'
+                  }`}
               >
                 <span className={`w-2 h-2 rounded-full ${selectedGameId === game.id ? 'bg-emerald-300' : 'bg-indigo-400'}`} />
                 <span className="max-w-[180px] truncate">{game.name}</span>
                 {game.code && <span className={selectedGameId === game.id ? 'text-white/60' : 'text-slate-400'}>{game.code}</span>}
-                <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${
-                  selectedGameId === game.id ? 'bg-white/15 text-white' : 'bg-slate-100 text-text-secondary'
-                }`}>
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${selectedGameId === game.id ? 'bg-white/15 text-white' : 'bg-slate-100 text-text-secondary'
+                  }`}>
                   {game.count}
                 </span>
               </button>
@@ -650,11 +518,10 @@ export const AdminResults: React.FC = () => {
 
                       {/* Status */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          result.status === 'Published'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-amber-50 text-amber-700'
-                        }`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${result.status === 'Published'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-amber-50 text-amber-700'
+                          }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${result.status === 'Published' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                           {result.status}
                         </span>
@@ -688,11 +555,10 @@ export const AdminResults: React.FC = () => {
                           <button
                             onClick={() => handleToggleStatus(result.id)}
                             title={result.status === 'Published' ? 'Set Inactive' : 'Set Active'}
-                            className={`p-1.5 rounded transition-colors ${
-                              result.status === 'Published'
-                                ? 'text-amber-500 hover:bg-amber-50'
-                                : 'text-emerald-600 hover:bg-emerald-50'
-                            }`}
+                            className={`p-1.5 rounded transition-colors ${result.status === 'Published'
+                              ? 'text-amber-500 hover:bg-amber-50'
+                              : 'text-emerald-600 hover:bg-emerald-50'
+                              }`}
                           >
                             <Globe className="w-4 h-4" />
                           </button>

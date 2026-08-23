@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination, ContactSettings, LiveBannerSettings } from '../types';
+import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination, ContactSettings, LiveBannerSettings, GamePrize } from '../types';
 import { apiUrl } from '../config/api';
 
 type AgentUpdate = Partial<Agent> & { password?: string };
@@ -40,7 +40,7 @@ interface AdminContextType {
   fetchResult: (id: string) => Promise<Result | null>;
   createGame: (game: Omit<Game, 'id'>) => Promise<void>;
   updateGame: (id: string, updatedGame: Partial<Game>) => Promise<void>;
-  deleteGame: (id: string) => void;
+  deleteGame: (id: string) => Promise<void>;
   toggleGameStatus: (id: string) => Promise<void>;
 
   generateBooks: (gameId: string, count: number, bookSize: number, ticketPrice: number) => { count: number; tickets: number; serialRange: string };
@@ -128,6 +128,12 @@ const toTitle = (value: string) =>
     .trim()
     .replace(/\b\w/g, char => char.toUpperCase());
 
+const formatApiFieldName = (fieldName: string) => {
+  const prizeMatch = fieldName.match(/^prizes\.(\d+)\.prize_image$/);
+  if (prizeMatch) return `Prize ${Number(prizeMatch[1]) + 1} Image`;
+  return toTitle(fieldName);
+};
+
 const extractApiErrorMessage = (body: unknown, fallback = 'Something went wrong. Please try again.') => {
   let parsed = body;
 
@@ -145,13 +151,11 @@ const extractApiErrorMessage = (body: unknown, fallback = 'Something went wrong.
     const data = parsed as any;
     const errors = data.errors || data.error;
     if (errors && typeof errors === 'object' && !Array.isArray(errors)) {
-      const firstKey = Object.keys(errors)[0];
-      const firstValue = errors[firstKey];
-      const firstMessage = Array.isArray(firstValue) ? firstValue[0] : firstValue;
-      if (firstMessage) {
-        const fieldName = toTitle(firstKey);
-        return fieldName ? `${fieldName}: ${String(firstMessage)}` : String(firstMessage);
-      }
+      const messages = Object.entries(errors).flatMap(([key, value]) => {
+        const values = Array.isArray(value) ? value : [value];
+        return values.filter(Boolean).map(value => `${formatApiFieldName(key)}: ${String(value)}`);
+      });
+      if (messages.length > 0) return messages.join(' | ');
     }
 
     if (Array.isArray(errors) && errors.length > 0) return String(errors[0]);
@@ -364,6 +368,32 @@ const INITIAL_WINNINGS: Winning[] = [
   { ticketNumber: '15099', bookId: 'BK1509', game: 'New Year Bumper Draw', agentId: 'AG1005', agentType: 'Third Party', prize: 'Consolation Prize', prizeValue: 10000, winner: 'Gopal Dutt', claimStatus: 'Rejected' }
 ];
 
+const mapGamePrizes = (rawPrizes: any[] = []): GamePrize[] => rawPrizes.map(prize => ({
+  id: prize.id,
+  rank: Number(prize.rank || 1),
+  prizeName: prize.prize_name || prize.prizeName || '',
+  prizeType: prize.prize_type === 'ticket_winner' ? 'ticket_winner' : 'book_winner',
+  prizeAmount: prize.prize_amount !== undefined ? Number(prize.prize_amount) : undefined,
+  image: prize.prize_image_url || prize.prize_image || prize.image_url || undefined
+}));
+
+const serializeGamePrizes = (prizes: GamePrize[] = []) => prizes.map(prize => ({
+  id: prize.id,
+  rank: prize.rank,
+  prize_name: prize.prizeName,
+  prize_type: prize.prizeType
+}));
+
+const appendGamePrizes = (formData: FormData, prizes: GamePrize[] = []) => {
+  prizes.forEach((prize, index) => {
+    formData.append(`prizes[${index}][rank]`, String(prize.rank));
+    formData.append(`prizes[${index}][prize_name]`, prize.prizeName);
+    formData.append(`prizes[${index}][prize_type]`, prize.prizeType);
+    if (prize.id !== undefined) formData.append(`prizes[${index}][id]`, String(prize.id));
+    if (prize.imageFile) formData.append(`prizes[${index}][prize_image]`, prize.imageFile);
+  });
+};
+
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('admin_auth') === 'true';
@@ -534,7 +564,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               description: g.youtube_live_url || '',
               image: getFullImageUrl(g.game_image),
               youtubeLiveUrl: g.youtube_live_url || '',
-              facebookLiveUrl: g.facebook_live_url || ''
+              facebookLiveUrl: g.facebook_live_url || '',
+              prizes: mapGamePrizes(g.prizes || []).map(prize => ({
+                ...prize,
+                image: prize.image ? getFullImageUrl(prize.image) : undefined
+              }))
             };
           });
           setGames(prev => append ? appendUnique(prev, mappedGames) : mappedGames);
@@ -1105,11 +1139,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       // If there is a raw file uploaded, send via multipart/form-data (FormData)
-      if (gameData.imageFile) {
+      if (gameData.imageFile || gameData.prizes?.some(prize => prize.imageFile)) {
         const formData = new FormData();
         formData.append('game_name', gameData.name);
         formData.append('game_id', gameData.gameCode);
-        formData.append('game_image', gameData.imageFile); // Raw File object
+        if (gameData.imageFile) formData.append('game_image', gameData.imageFile); // Raw File object
         formData.append('ticket_price', String(gameData.ticketPrice));
         formData.append('book_size', String(gameData.bookSize));
         formData.append('total_books', String(Math.max(1, gameData.totalBooks || 0)));
@@ -1118,6 +1152,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         formData.append('youtube_live_url', gameData.youtubeLiveUrl || 'https://youtube.com/live/demo');
         formData.append('facebook_live_url', gameData.facebookLiveUrl || 'https://facebook.com/live/demo');
         formData.append('status', apiStatus);
+        appendGamePrizes(formData, gameData.prizes || []);
 
         const response = await fetch(apiUrl('/api/v1/admin/games'), {
           method: 'POST',
@@ -1130,7 +1165,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(errorText || 'Server responded with an error during multipart image upload.');
+          throw new Error(extractApiErrorMessage(errorText, 'Unable to create game. Please review the game and prize details.'));
         }
 
         await fetchGames();
@@ -1141,7 +1176,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const payload = {
         game_name: gameData.name,
         game_id: gameData.gameCode,
-        game_image: 'game1.png',
+        game_image: undefined,
         ticket_price: Number(gameData.ticketPrice),
         book_size: Number(gameData.bookSize),
         total_books: Math.max(1, Number(gameData.totalBooks || 0)),
@@ -1149,7 +1184,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         draw_time: formattedTime || '18:00:00',
         youtube_live_url: gameData.youtubeLiveUrl || 'https://youtube.com/live/demo',
         facebook_live_url: gameData.facebookLiveUrl || 'https://facebook.com/live/demo',
-        status: apiStatus
+        status: apiStatus,
+        prizes: serializeGamePrizes(gameData.prizes || [])
       };
 
       const response = await fetch(apiUrl('/api/v1/admin/games'), {
@@ -1163,7 +1199,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'Server responded with an error status.');
+        throw new Error(extractApiErrorMessage(errorText, 'Unable to create game. Please review the game and prize details.'));
       }
 
       await fetchGames();
@@ -1181,11 +1217,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (formattedTime && formattedTime.split(':').length === 2) formattedTime += ':00';
 
     try {
-      if (updatedGame.imageFile) {
+      if (updatedGame.imageFile || updatedGame.prizes?.some(prize => prize.imageFile)) {
         const formData = new FormData();
         if (updatedGame.name) formData.append('game_name', updatedGame.name);
         if (updatedGame.gameCode) formData.append('game_id', updatedGame.gameCode);
-        formData.append('game_image', updatedGame.imageFile);
+        if (updatedGame.imageFile) formData.append('game_image', updatedGame.imageFile);
         if (updatedGame.ticketPrice) formData.append('ticket_price', String(updatedGame.ticketPrice));
         if (updatedGame.bookSize) formData.append('book_size', String(updatedGame.bookSize));
         if (updatedGame.drawDate) formData.append('draw_date', updatedGame.drawDate);
@@ -1193,6 +1229,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (updatedGame.youtubeLiveUrl) formData.append('youtube_live_url', updatedGame.youtubeLiveUrl);
         if (updatedGame.facebookLiveUrl) formData.append('facebook_live_url', updatedGame.facebookLiveUrl);
         if (updatedGame.status) formData.append('status', apiStatus);
+        appendGamePrizes(formData, updatedGame.prizes || []);
         formData.append('_method', 'PUT');
 
         const res = await fetch(apiUrl(`/api/v1/admin/games/${id}`), {
@@ -1202,7 +1239,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
         if (!res.ok) {
           const t = await res.text();
-          try { const j = JSON.parse(t); throw new Error(j.message || t || 'Update failed.'); } catch { throw new Error(t || 'Update failed.'); }
+          throw new Error(extractApiErrorMessage(t, 'Unable to update game. Please review the game and prize details.'));
         }
       } else {
         const payload: any = { draw_time: formattedTime || '18:00:00' };
@@ -1214,6 +1251,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (updatedGame.youtubeLiveUrl !== undefined) payload.youtube_live_url = updatedGame.youtubeLiveUrl;
         if (updatedGame.facebookLiveUrl !== undefined) payload.facebook_live_url = updatedGame.facebookLiveUrl;
         if (updatedGame.status !== undefined) payload.status = apiStatus;
+        if (updatedGame.prizes !== undefined) {
+          payload.prizes = serializeGamePrizes(updatedGame.prizes);
+        }
 
         const res = await fetch(apiUrl(`/api/v1/admin/games/${id}`), {
           method: 'PUT',
@@ -1222,7 +1262,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
         if (!res.ok) {
           const t = await res.text();
-          try { const j = JSON.parse(t); throw new Error(j.message || t || 'Update failed.'); } catch { throw new Error(t || 'Update failed.'); }
+          throw new Error(extractApiErrorMessage(t, 'Unable to update game. Please review the game and prize details.'));
         }
       }
       await fetchGames();
@@ -1231,7 +1271,21 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const deleteGame = (id: string) => {
+  const deleteGame = async (id: string) => {
+    const token = localStorage.getItem('admin_token') || '';
+    const response = await fetch(apiUrl(`/api/v1/admin/games/${encodeURIComponent(id)}`), {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(extractApiErrorMessage(errorText, 'Unable to delete game. Please try again.'));
+    }
+
     setGames(prev => prev.filter(g => g.id !== id));
   };
 
@@ -1614,6 +1668,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       );
       if (p.prize_image instanceof File) {
         formData.append(`prizes[${index}][prize_image]`, p.prize_image);
+      } else if (typeof p.prize_image === 'string' && p.prize_image) {
+        formData.append(`prizes[${index}][existing_prize_image]`, p.prize_image);
       }
       // No image field appended when no new file — backend preserves existing image
     };
