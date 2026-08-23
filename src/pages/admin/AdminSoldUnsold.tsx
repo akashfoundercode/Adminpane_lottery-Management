@@ -12,6 +12,8 @@ export const AdminSoldUnsold: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [gameFilter, setGameFilter] = useState('All');
     const [agentFilter, setAgentFilter] = useState('All');
+    const [currentPage, setCurrentPage] = useState(1);
+    const currentPageRef = React.useRef(1);
     const [pendingStatus, setPendingStatus] = useState<{ bookId: string; status: 'Sold' | 'Unsold' } | null>(null);
     const [isUpdating, setIsUpdating] = useState(false);
     const [unlockingBookId, setUnlockingBookId] = useState<string | null>(null);
@@ -19,10 +21,10 @@ export const AdminSoldUnsold: React.FC = () => {
     useEffect(() => {
         fetchBooks(10, 1, false);
         const refreshInterval = window.setInterval(() => {
-            fetchBooks(10, currentPage, false);
+            fetchBooks(10, currentPageRef.current, false);
         }, 30000);
         return () => window.clearInterval(refreshInterval);
-    }, [currentPage]);
+    }, []);
 
     const getAgentName = (agentId?: string, agentName?: string) => {
         if (agentName) return agentName;
@@ -121,7 +123,12 @@ export const AdminSoldUnsold: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-border-light shadow-sm overflow-hidden">
+                <div className="relative bg-white rounded-xl border border-border-light shadow-sm overflow-hidden">
+                    {loadingBooks && books.length > 0 && (
+                        <div className="absolute inset-0 z-10 flex items-start justify-center bg-white/70 pt-20 backdrop-blur-[1px]" role="status" aria-label="Refreshing books">
+                            <PageLoader />
+                        </div>
+                    )}
                     {loadingBooks && books.length === 0 ? (
                         <PageLoader />
                     ) : soldUnsoldHistory.length === 0 ? (
@@ -205,7 +212,12 @@ export const AdminSoldUnsold: React.FC = () => {
             {booksPagination.hasMore && (
                 <div className="flex justify-center border-t border-border-light pt-4">
                     <button
-                        onClick={() => fetchBooks(10, booksPagination.currentPage * 10, true)}
+                        onClick={() => {
+                            const nextPage = currentPage + 1;
+                            currentPageRef.current = nextPage;
+                            setCurrentPage(nextPage);
+                            fetchBooks(10, nextPage, true);
+                        }}
                         className="px-4 py-2 border border-border-light bg-white rounded-lg text-xs font-semibold text-text-primary hover:bg-slate-50"
                     >
                         View More
