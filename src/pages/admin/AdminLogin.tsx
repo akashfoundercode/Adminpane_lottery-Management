@@ -16,7 +16,7 @@ export const AdminLogin: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       showToast('Please fill in all fields.', 'error');
       return;
     }

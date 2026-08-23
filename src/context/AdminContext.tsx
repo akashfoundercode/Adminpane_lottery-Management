@@ -1064,13 +1064,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [isAdminAuthenticated]);
 
   const adminLogin = async (email: string, password: string): Promise<boolean> => {
+    const normalizedEmail = email.trim();
     try {
       const response = await fetch(apiUrl('/api/v1/admin/login'), {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: normalizedEmail, password })
       });
 
       const responseText = await response.text();
@@ -1078,7 +1080,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try { data = responseText ? JSON.parse(responseText) : null; } catch { /* Non-JSON error response. */ }
 
       if (!response.ok || data?.success === false) {
-        throw new Error(extractApiErrorMessage(data || responseText, 'Invalid email or password. Please try again.'));
+        const fallback = response.status === 401
+          ? 'Invalid admin email or password. Please check your credentials.'
+          : `Login failed (${response.status}). Please try again.`;
+        throw new Error(extractApiErrorMessage(data || responseText, fallback));
       }
 
       // Parse token from potential response schemas
@@ -1093,7 +1098,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Extract details
       const adminName = (data.admin && data.admin.name) || (data.data && data.data.name) || 'Admin User';
       const role = (data.admin && data.admin.role) || (data.data && data.data.role) || 'Super Admin';
-      const profile = { email, name: adminName, role };
+      const profile = { email: normalizedEmail, name: adminName, role };
 
       setIsAdminAuthenticated(true);
       setAdminUser(profile);

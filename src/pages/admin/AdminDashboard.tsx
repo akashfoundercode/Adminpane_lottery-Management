@@ -123,14 +123,18 @@ export const AdminDashboard: React.FC = () => {
       .slice(0, 5);
   }, [agents, books]);
 
-  // Recent Games Table (Static from reference image)
-  const recentGames = [
-    { name: 'Summer Lucky Draw', drawDate: '20 May 2025', status: 'Live', totalBooks: 200, soldBooks: 150 },
-    { name: 'Mega Bumper Draw', drawDate: '25 May 2025', status: 'Upcoming', totalBooks: 300, soldBooks: 80 },
-    { name: 'Diwali Special Draw', drawDate: '30 May 2025', status: 'Upcoming', totalBooks: 250, soldBooks: 60 },
-    { name: 'Holiday Lucky Draw', drawDate: '05 June 2025', status: 'Completed', totalBooks: 150, soldBooks: 150 },
-    { name: 'New Year Bumper Draw', drawDate: '10 June 2025', status: 'Completed', totalBooks: 350, soldBooks: 320 }
-  ];
+  const recentGames = useMemo(() => {
+    const formatDate = (value: string) => {
+      const parsed = new Date(`${value}T00:00:00`);
+      return Number.isNaN(parsed.getTime()) ? value || '-' : parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    return games.slice(0, 5).map(game => ({
+      ...game,
+      drawDateLabel: formatDate(game.drawDate),
+      soldBooks: books.filter(book => book.gameId === game.id && book.status === 'Sold').length
+    }));
+  }, [games, books]);
 
   const formatRupee = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -411,10 +415,14 @@ export const AdminDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-light">
-                {recentGames.map((game, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                {recentGames.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 px-3 text-center text-text-secondary">No games available.</td>
+                  </tr>
+                ) : recentGames.map(game => (
+                  <tr key={game.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="py-2.5 px-3 font-medium text-text-primary">{game.name}</td>
-                    <td className="py-2.5 px-3 text-text-secondary font-medium">{game.drawDate}</td>
+                    <td className="py-2.5 px-3 text-text-secondary font-medium">{game.drawDateLabel}</td>
                     <td className="py-2.5 px-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${game.status === 'Live' ? 'bg-emerald-100 text-emerald-800' :
                         game.status === 'Upcoming' ? 'bg-sky-100 text-sky-800' :
