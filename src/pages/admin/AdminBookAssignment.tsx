@@ -104,7 +104,7 @@ export const AdminBookAssignment: React.FC = () => {
 
     try {
       showToast('Processing assignment on server...', 'info');
-      await assignBooks(selectedGameId, selectedBookIds, selectedAgentId, expiryDate);
+      await assignBooks(selectedGameId, selectedBookIds, selectedAgentId);
       showToast(`Successfully assigned ${selectedBookIds.length} books to ${selectedAgent?.name}.`, 'success');
       setSelectedBookIds([]);
     } catch (err: any) {

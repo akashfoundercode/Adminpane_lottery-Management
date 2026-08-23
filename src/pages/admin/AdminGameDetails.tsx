@@ -8,7 +8,7 @@ import { apiUrl } from '../../config/api';
 
 export const AdminGameDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { games, deleteGame, fetchGameLockStatus, unlockBookByAdmin } = useAdmin();
+  const { games, deleteGame, fetchGameLockStatus, updateBookStatus, markBooksUnsoldByAdmin } = useAdmin();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -20,6 +20,7 @@ export const AdminGameDetails: React.FC = () => {
   const [lockStatus, setLockStatus] = useState<{ is_locked: boolean; remaining_minutes: number; lock_deadline_at: string | null; status: string } | null>(null);
   const [lockStatusLoading, setLockStatusLoading] = useState(false);
   const [unlockingBookId, setUnlockingBookId] = useState<string | null>(null);
+  const [manualExpiring, setManualExpiring] = useState(false);
 
   const fetchGameBooks = async (page = 1) => {
     if (!game) return;
@@ -108,14 +109,30 @@ export const AdminGameDetails: React.FC = () => {
   const handleUnlockBook = async (book: Book) => {
     setUnlockingBookId(book.id);
     try {
-      await unlockBookByAdmin(book.apiId ?? book.id);
+      await updateBookStatus(book.id, 'Assigned');
       setGameBooks(prev => prev.map(item => item.id === book.id ? { ...item, status: 'Assigned' } : item));
-      showToast(`Book ${book.id} unlocked for the agent.`, 'success');
+      showToast(`Book ${book.id} reopened for the agent.`, 'success');
     } catch (error) {
       console.error('Failed to mark book as unsold by admin:', error);
       showToast(error instanceof Error ? error.message : 'Failed to mark book as Unsold by Admin.', 'error');
     } finally {
       setUnlockingBookId(null);
+    }
+  };
+
+  const handleManualExpire = async () => {
+    if (!game) return;
+    setManualExpiring(true);
+    try {
+      await markBooksUnsoldByAdmin(game.id);
+      await fetchGameBooks(1);
+      const status = await fetchGameLockStatus(game.id);
+      setLockStatus(status);
+      showToast('Books marked as Unsold by Admin.', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to expire books.', 'error');
+    } finally {
+      setManualExpiring(false);
     }
   };
 
@@ -165,6 +182,16 @@ export const AdminGameDetails: React.FC = () => {
           </div>
         </div>
         {lockStatusLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-text-secondary" />}
+        {lockStatus?.is_locked && (
+          <button
+            type="button"
+            onClick={handleManualExpire}
+            disabled={manualExpiring}
+            className="rounded-lg bg-rose-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {manualExpiring ? 'Expiring...' : 'Mark Unsold by Admin'}
+          </button>
+        )}
       </div>
 
       {/* METRICS ROW */}

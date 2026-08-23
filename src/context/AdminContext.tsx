@@ -46,9 +46,10 @@ interface AdminContextType {
 
   generateBooks: (gameId: string, count: number, bookSize: number, ticketPrice: number) => { count: number; tickets: number; serialRange: string };
   importBooks: (gameId: string, file: File) => Promise<void>;
-  assignBooks: (gameId: string, bookIds: string[], agentId: string, expiryDate: string) => Promise<void>;
+  assignBooks: (gameId: string, bookIds: string[], agentId: string, expiryDate?: string) => Promise<void>;
   revokeAssignment: (bookId: string) => void;
-  updateBookStatus: (bookId: string, status: 'Sold' | 'Unsold') => Promise<void>;
+  updateBookStatus: (bookId: string, status: 'Sold' | 'Unsold' | 'Assigned') => Promise<void>;
+  markBooksUnsoldByAdmin: (gameId: string) => Promise<void>;
   unlockBookByAdmin: (bookId: string | number) => Promise<void>;
 
   createAgent: (agent: Omit<Agent, 'id' | 'agentId'> & { password: string }) => Promise<void>;
@@ -1452,8 +1453,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Book Assignment
-  const assignBooks = async (gameId: string, bookIds: string[], agentId: string, expiryDate: string) => {
-    const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+  const assignBooks = async (_gameId: string, bookIds: string[], agentId: string, _expiryDate?: string) => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) throw new Error('Admin session is missing. Please log in again.');
 
     // Find numeric database IDs for books
     const numericBookIds = bookIds.map(bId => {
@@ -1469,10 +1471,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const payload = {
-      game_id: Number(gameId),
       agent_id: Number(agentId),
-      book_ids: numericBookIds,
-      expiry_date: expiryDate
+      book_ids: numericBookIds
     };
 
     try {
@@ -1537,7 +1537,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const updateBookStatus = async (bookId: string, status: 'Sold' | 'Unsold') => {
+  const updateBookStatus = async (bookId: string, status: 'Sold' | 'Unsold' | 'Assigned') => {
     const book = books.find(item => item.id === bookId);
     const apiBookId = Number(book?.apiId || book?.bookNumber || book?.id.replace(/^BK/i, ''));
     if (!book || !Number.isInteger(apiBookId)) {
@@ -1568,12 +1568,28 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw new Error(result?.message || `Failed to update book status to ${status}.`);
     }
 
-    const updatedStatus = result?.data?.status?.toLowerCase() === 'sold' ? 'Sold' : 'Unsold';
+    const responseStatus = result?.data?.status?.toLowerCase();
+    const updatedStatus = responseStatus === 'sold' ? 'Sold' : responseStatus === 'assigned' ? 'Assigned' : 'Unsold';
     setBooks(prev => prev.map(item => item.id === bookId ? {
       ...item,
       status: updatedStatus,
-      ...(updatedStatus === 'Sold' ? { soldDate: result?.data?.sold_at || new Date().toISOString() } : { unsoldDate: result?.data?.unsold_at || new Date().toISOString() })
+      ...(updatedStatus === 'Sold' ? { soldDate: result?.data?.sold_at || new Date().toISOString() } : updatedStatus === 'Unsold' ? { unsoldDate: result?.data?.unsold_at || new Date().toISOString() } : {})
     } : item));
+    await fetchBooks();
+  };
+
+  const markBooksUnsoldByAdmin = async (gameId: string) => {
+    const token = localStorage.getItem('admin_token');
+    if (!token) throw new Error('Admin session is missing. Please log in again.');
+    const response = await fetch(apiUrl('/api/v1/admin/books/mark-unsold-by-admin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ game_id: Number(gameId) })
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Failed to mark books as Unsold by Admin.');
+    }
     await fetchBooks();
   };
 
@@ -1960,6 +1976,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       assignBooks,
       revokeAssignment,
       updateBookStatus,
+      markBooksUnsoldByAdmin,
       unlockBookByAdmin,
       createAgent,
       updateAgent,
