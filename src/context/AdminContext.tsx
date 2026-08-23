@@ -51,6 +51,7 @@ interface AdminContextType {
 
   createAgent: (agent: Omit<Agent, 'id' | 'agentId'> & { password: string }) => Promise<void>;
   updateAgent: (id: string, updatedAgent: AgentUpdate) => Promise<void>;
+  deleteAgent: (id: string) => Promise<void>;
   toggleAgentStatus: (id: string) => void;
 
   createPrize: (prize: Omit<Prize, 'id'>) => void;
@@ -1624,6 +1625,27 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await fetchAgents();
   };
 
+  const deleteAgent = async (id: string) => {
+    const token = localStorage.getItem('admin_token') || '';
+    const response = await fetch(apiUrl(`/api/v1/admin/agents/${encodeURIComponent(id)}`), {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const responseText = await response.text();
+    let data: any = null;
+    try { data = responseText ? JSON.parse(responseText) : null; } catch { /* Empty or non-JSON success response. */ }
+
+    if (!response.ok || data?.success === false) {
+      throw new Error(extractApiErrorMessage(data || responseText, 'Unable to delete agent. Please try again.'));
+    }
+
+    setAgents(prev => prev.filter(agent => agent.id !== id));
+  };
+
   const toggleAgentStatus = (id: string) => {
     setAgents(prev => prev.map(a => a.id === id ? { ...a, status: a.status === 'Active' ? 'Inactive' : 'Active' } : a));
   };
@@ -1883,6 +1905,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updateBookStatus,
       createAgent,
       updateAgent,
+      deleteAgent,
       toggleAgentStatus,
       createPrize,
       updatePrize,

@@ -2,11 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Search, Plus, Edit, UserCheck, UserX, Eye, AlertCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, UserCheck, UserX, Eye, AlertCircle } from 'lucide-react';
 import { PageLoader } from '../../components/PageLoader';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 export const AdminAgentsThirdParty: React.FC = () => {
-  const { agents, agentsPagination, createAgent, updateAgent, toggleAgentStatus, fetchAgents, loadingAgents } = useAdmin();
+  const { agents, agentsPagination, createAgent, updateAgent, deleteAgent, toggleAgentStatus, fetchAgents, loadingAgents } = useAdmin();
   const { showToast } = useToast();
 
   React.useEffect(() => {
@@ -21,6 +22,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [deleteAgentId, setDeleteAgentId] = useState<string | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -147,6 +149,17 @@ export const AdminAgentsThirdParty: React.FC = () => {
     showToast(`Agent status updated to ${currentStatus === 'Active' ? 'Inactive' : 'Active'}.`, 'success');
   };
 
+  const handleConfirmDelete = async () => {
+    if (!deleteAgentId) return;
+    try {
+      await deleteAgent(deleteAgentId);
+      showToast('Agent deleted successfully.', 'success');
+      setDeleteAgentId(null);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to delete agent.', 'error');
+    }
+  };
+
   return (
     <div className="space-y-6 font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -232,6 +245,13 @@ export const AdminAgentsThirdParty: React.FC = () => {
                           className="text-text-secondary hover:text-indigo-600"
                         >
                           <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteAgentId(agent.id)}
+                          aria-label={`Delete ${agent.name}`}
+                          className="text-text-secondary hover:text-rose-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -431,6 +451,16 @@ export const AdminAgentsThirdParty: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={deleteAgentId !== null}
+        onClose={() => setDeleteAgentId(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Agent"
+        description="Are you sure you want to delete this agent? This action cannot be undone."
+        type="danger"
+        confirmText="Delete Agent"
+      />
     </div>
   );
 };
