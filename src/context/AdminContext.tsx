@@ -42,12 +42,14 @@ interface AdminContextType {
   updateGame: (id: string, updatedGame: Partial<Game>) => Promise<void>;
   deleteGame: (id: string) => Promise<void>;
   toggleGameStatus: (id: string) => Promise<void>;
+  fetchGameLockStatus: (gameId: string) => Promise<GameLockStatus>;
 
   generateBooks: (gameId: string, count: number, bookSize: number, ticketPrice: number) => { count: number; tickets: number; serialRange: string };
   importBooks: (gameId: string, file: File) => Promise<void>;
   assignBooks: (gameId: string, bookIds: string[], agentId: string, expiryDate: string) => Promise<void>;
   revokeAssignment: (bookId: string) => void;
   updateBookStatus: (bookId: string, status: 'Sold' | 'Unsold') => Promise<void>;
+  unlockBookByAdmin: (bookId: string | number) => Promise<void>;
 
   createAgent: (agent: Omit<Agent, 'id' | 'agentId'> & { password: string }) => Promise<void>;
   updateAgent: (id: string, updatedAgent: AgentUpdate) => Promise<void>;
@@ -76,6 +78,15 @@ interface AdminContextType {
   fetchLiveBanners: (gameId: string) => Promise<LiveBannerSettings>;
   saveLiveBanners: (gameId: string, settings: { youtube_live_url: string; facebook_live_url: string; banners: File[]; existing_banners?: string[] }) => Promise<LiveBannerSettings>;
   deleteLiveBanner: (gameId: string, bannerId: number | string) => Promise<void>;
+}
+
+export interface GameLockStatus {
+  game_id: number | string;
+  status: string;
+  went_live_at: string | null;
+  lock_deadline_at: string | null;
+  is_locked: boolean;
+  remaining_minutes: number;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -1554,6 +1565,39 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await fetchBooks();
   };
 
+  const fetchGameLockStatus = async (gameId: string): Promise<GameLockStatus> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const response = await fetch(apiUrl(`/api/v1/admin/games/${encodeURIComponent(gameId)}/lock-status`), {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+    const result = await response.json();
+    if (!response.ok || result?.success === false || !result?.data) {
+      throw new Error(result?.message || 'Failed to fetch game lock status.');
+    }
+    return result.data as GameLockStatus;
+  };
+
+  const unlockBookByAdmin = async (bookId: string | number) => {
+    const token = localStorage.getItem('admin_token') || '';
+    const response = await fetch(apiUrl('/api/v1/admin/books/unlock-by-admin'), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ book_id: bookId })
+    });
+    const result = await response.json();
+    if (!response.ok || result?.success === false) {
+      throw new Error(result?.message || 'Failed to mark book as unsold by admin.');
+    }
+
+    await fetchBooks();
+  };
+
   // Agent CRUD
   const createAgent = async (agentData: Omit<Agent, 'id' | 'agentId'> & { password: string }) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
@@ -1898,11 +1942,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updateGame,
       deleteGame,
       toggleGameStatus,
+      fetchGameLockStatus,
       generateBooks,
       importBooks,
       assignBooks,
       revokeAssignment,
       updateBookStatus,
+      unlockBookByAdmin,
       createAgent,
       updateAgent,
       deleteAgent,

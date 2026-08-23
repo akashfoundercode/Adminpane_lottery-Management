@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
-import { ArrowLeft, Calendar, Layers, AlertCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Layers, AlertCircle, Trash2, Lock, RefreshCw } from 'lucide-react';
 import type { Book } from '../../types';
 import { apiUrl } from '../../config/api';
 
 export const AdminGameDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { games, deleteGame } = useAdmin();
+  const { games, deleteGame, fetchGameLockStatus, unlockBookByAdmin } = useAdmin();
   const navigate = useNavigate();
 
   const game = games.find(g => g.id === id);
@@ -15,6 +15,9 @@ export const AdminGameDetails: React.FC = () => {
   const [gameBooks, setGameBooks] = useState<Book[]>([]);
   const [booksLoading, setBooksLoading] = useState(false);
   const [booksPagination, setBooksPagination] = useState({ total: 0, currentPage: 1, lastPage: 1 });
+  const [lockStatus, setLockStatus] = useState<{ is_locked: boolean; remaining_minutes: number; lock_deadline_at: string | null; status: string } | null>(null);
+  const [lockStatusLoading, setLockStatusLoading] = useState(false);
+  const [unlockingBookId, setUnlockingBookId] = useState<string | null>(null);
 
   const fetchGameBooks = async (page = 1) => {
     if (!game) return;
@@ -70,6 +73,28 @@ export const AdminGameDetails: React.FC = () => {
     if (game) fetchGameBooks(1);
   }, [id, games.length]);
 
+  useEffect(() => {
+    if (!game) return;
+    let mounted = true;
+    const checkLockStatus = async () => {
+      setLockStatusLoading(true);
+      try {
+        const status = await fetchGameLockStatus(game.id);
+        if (mounted) setLockStatus(status);
+      } catch (error) {
+        if (mounted) console.error('Failed to fetch game lock status:', error);
+      } finally {
+        if (mounted) setLockStatusLoading(false);
+      }
+    };
+    checkLockStatus();
+    const intervalId = window.setInterval(checkLockStatus, 30000);
+    return () => {
+      mounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [game?.id]);
+
   // Derived stats
   const totalBooks = booksPagination.total || gameBooks.length;
   const soldBooks = gameBooks.filter(b => b.status === 'Sold').length;
@@ -77,6 +102,18 @@ export const AdminGameDetails: React.FC = () => {
   const expiredBooks = gameBooks.filter(b => b.status === 'Unsold by Admin').length;
   const assignedBooks = gameBooks.filter(b => b.status === 'Assigned' || b.status === 'In Progress').length;
   const availableBooks = gameBooks.filter(b => b.status === 'Available').length;
+
+  const handleUnlockBook = async (book: Book) => {
+    setUnlockingBookId(book.id);
+    try {
+      await unlockBookByAdmin(book.apiId ?? book.id);
+      setGameBooks(prev => prev.map(item => item.id === book.id ? { ...item, status: 'Unsold by Admin' } : item));
+    } catch (error) {
+      console.error('Failed to mark book as unsold by admin:', error);
+    } finally {
+      setUnlockingBookId(null);
+    }
+  };
 
   if (!game) {
     return (
@@ -111,6 +148,19 @@ export const AdminGameDetails: React.FC = () => {
           <h2 className="text-[20px] font-bold text-text-primary font-display">{game.name} Details</h2>
           <p className="text-xs text-text-secondary">Code: {game.gameCode} | Status: {game.status}</p>
         </div>
+      </div>
+
+      <div className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs ${lockStatus?.is_locked ? 'border-rose-200 bg-rose-50' : 'border-sky-200 bg-sky-50'}`}>
+        <div className="flex items-center gap-2">
+          <Lock className={`w-4 h-4 ${lockStatus?.is_locked ? 'text-rose-600' : 'text-sky-600'}`} />
+          <div>
+            <p className="font-bold text-text-primary">{lockStatus?.is_locked ? 'Book lock is active' : 'Book lock window is open'}</p>
+            <p className="text-[11px] text-text-secondary">
+              {lockStatus?.is_locked ? 'Uncompleted assigned books can be marked Unsold by Admin.' : `${lockStatus?.remaining_minutes ?? '-'} minutes remaining`}
+            </p>
+          </div>
+        </div>
+        {lockStatusLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin text-text-secondary" />}
       </div>
 
       {/* METRICS ROW */}
@@ -227,6 +277,7 @@ export const AdminGameDetails: React.FC = () => {
                     <th className="py-2.5 px-3">Serial Number</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3">Assigned Agent</th>
+                    <th className="py-2.5 px-3 text-right">Admin Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-light">
@@ -248,6 +299,19 @@ export const AdminGameDetails: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-2 px-3 text-text-primary font-medium">{b.agentName || '-'}</td>
+                      <td className="py-2 px-3 text-right">
+                        {lockStatus?.is_locked && (b.status === 'Assigned' || b.status === 'In Progress') && (
+                          <button
+                            type="button"
+                            onClick={() => handleUnlockBook(b)}
+                            disabled={unlockingBookId === b.id}
+                            className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-[9px] font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Lock className="w-3 h-3" />
+                            {unlockingBookId === b.id ? 'Updating...' : 'Unsold by Admin'}
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
