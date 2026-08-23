@@ -598,7 +598,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
     setLoadingBooks(true);
     try {
-      const response = await fetch(apiUrl(`/api/v1/admin/books?page=${page}&limit=${limit}`), {
+      const response = await fetch(apiUrl(`/api/v1/admin/books/status?page=${page}&limit=${limit}`), {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -659,6 +659,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               bookName: bookName,
               agentId: b.agent_id ? String(b.agent_id) : '',
               agentName: b.agent?.agent_name || b.agent_name || '',
+              assignmentId: b.assignment_id,
+              gameStatus: b.game_status || b.game?.status || '',
+              gameLiveAt: b.game_live_at || b.game?.live_at || '',
+              deadlineAt: b.deadline_at || b.expiry_at || '',
+              isLocked: Boolean(b.is_locked),
+              reopenRequestStatus: b.reopen_request_status || '',
+              reopenRequestId: b.reopen_request_id,
+              requestedAt: b.requested_at || '',
+              requestReason: b.request_reason || '',
               tickets: tickets,
               bookValue: ticketCount * 100,
               bookNumber: String(b.id),

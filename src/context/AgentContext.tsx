@@ -353,6 +353,15 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           createdDate: item.created_at || '',
           soldDate: item.sold_at || item.sold_date || '',
           unsoldDate: item.unsold_at || item.unsold_date || '',
+          assignmentId: item.assignment_id,
+          gameStatus: item.game_status || item.game?.status || '',
+          gameLiveAt: item.game_live_at || item.game?.live_at || '',
+          deadlineAt: item.deadline_at || item.expiry_date || '',
+          isLocked: Boolean(item.is_locked),
+          reopenRequestStatus: item.reopen_request_status || '',
+          reopenRequestId: item.reopen_request_id,
+          requestedAt: item.requested_at || '',
+          requestReason: item.request_reason || '',
           status: normalizeBookStatus(item.status)
         };
       });

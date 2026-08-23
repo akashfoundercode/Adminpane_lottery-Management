@@ -30,6 +30,7 @@ import {
   AdminBookAssignment,
   AdminAssignmentHistory,
   AdminSoldUnsold,
+  AdminReopenRequests,
   AdminAgentsFirstParty,
   AdminAgentsThirdParty,
   AdminAgentDetails,
@@ -100,6 +101,7 @@ function App() {
                         <Route path="book-assignment" element={<AdminBookAssignment />} />
                         <Route path="assignment-history" element={<AdminAssignmentHistory />} />
                         <Route path="sold-unsold" element={<AdminSoldUnsold />} />
+                        <Route path="reopen-requests" element={<AdminReopenRequests />} />
                         <Route path="agents/first-party" element={<AdminAgentsFirstParty />} />
                         <Route path="agents/third-party" element={<AdminAgentsThirdParty />} />
                         <Route path="agents/:id" element={<AdminAgentDetails />} />
