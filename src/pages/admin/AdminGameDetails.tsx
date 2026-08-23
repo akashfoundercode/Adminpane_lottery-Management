@@ -109,8 +109,8 @@ export const AdminGameDetails: React.FC = () => {
     setUnlockingBookId(book.id);
     try {
       await unlockBookByAdmin(book.apiId ?? book.id);
-      setGameBooks(prev => prev.map(item => item.id === book.id ? { ...item, status: 'Unsold by Admin' } : item));
-      showToast(`Book ${book.id} marked as Unsold by Admin.`, 'success');
+      setGameBooks(prev => prev.map(item => item.id === book.id ? { ...item, status: 'Assigned' } : item));
+      showToast(`Book ${book.id} unlocked for the agent.`, 'success');
     } catch (error) {
       console.error('Failed to mark book as unsold by admin:', error);
       showToast(error instanceof Error ? error.message : 'Failed to mark book as Unsold by Admin.', 'error');
@@ -292,19 +292,18 @@ export const AdminGameDetails: React.FC = () => {
                           {b.id}
                         </Link>
                       </td>
-                      <td className="py-2 px-3 font-mono font-medium text-text-secondary">{b.serialNumber}</td>
                       <td className="py-2 px-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${b.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' :
-                          b.status === 'Assigned' ? 'bg-purple-100 text-purple-800' :
-                            b.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                              'bg-amber-100 text-amber-800'
-                          }`}>
-                          {b.status}
-                        </span>
+                        {(() => {
+                          const isLockedAssignedBook = lockStatus?.is_locked && String(b.status).toUpperCase() === 'ASSIGNED';
+                          const statusClass = isLockedAssignedBook ? 'bg-rose-100 text-rose-800' : b.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' : b.status === 'Assigned' ? 'bg-purple-100 text-purple-800' : b.status === 'Available' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800';
+                          return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${statusClass}`}>
+                            {isLockedAssignedBook ? 'Locked' : b.status}
+                          </span>;
+                        })()}
                       </td>
                       <td className="py-2 px-3 text-text-primary font-medium">{b.agentName || '-'}</td>
                       <td className="py-2 px-3 text-right">
-                        {lockStatus?.is_locked && (b.status === 'Assigned' || b.status === 'In Progress') && (
+                        {String(b.status).toUpperCase() === 'UNSOLD BY ADMIN' && (
                           <button
                             type="button"
                             onClick={() => handleUnlockBook(b)}
@@ -312,7 +311,7 @@ export const AdminGameDetails: React.FC = () => {
                             className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-[9px] font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <Lock className="w-3 h-3" />
-                            {unlockingBookId === b.id ? 'Updating...' : 'Unsold by Admin'}
+                            {unlockingBookId === b.id ? 'Unlocking...' : 'Unlock for Agent'}
                           </button>
                         )}
                       </td>
