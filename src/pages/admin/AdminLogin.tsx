@@ -30,8 +30,8 @@ export const AdminLogin: React.FC = () => {
       } else {
         showToast('Invalid email or password.', 'error');
       }
-    } catch (err) {
-      showToast('An error occurred during login.', 'error');
+    } catch (err: any) {
+      showToast(err.message || 'An error occurred during login.', 'error');
     } finally {
       setIsLoading(false);
     }

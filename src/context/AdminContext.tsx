@@ -1073,17 +1073,22 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify({ email, password })
       });
 
-      if (!response.ok) {
-        throw new Error('Invalid email or password. Please try again.');
-      }
+      const responseText = await response.text();
+      let data: any = null;
+      try { data = responseText ? JSON.parse(responseText) : null; } catch { /* Non-JSON error response. */ }
 
-      const data = await response.json();
+      if (!response.ok || data?.success === false) {
+        throw new Error(extractApiErrorMessage(data || responseText, 'Invalid email or password. Please try again.'));
+      }
 
       // Parse token from potential response schemas
       const receivedToken = data.token ||
         data.access_token ||
-        (data.data && (data.data.token || data.data.access_token)) ||
-        '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d'; // fallback to user token
+        (data.data && (data.data.token || data.data.access_token));
+
+      if (!receivedToken) {
+        throw new Error('Login response did not include an access token.');
+      }
 
       // Extract details
       const adminName = (data.admin && data.admin.name) || (data.data && data.data.name) || 'Admin User';
