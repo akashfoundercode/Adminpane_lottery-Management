@@ -1588,7 +1588,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ book_id: bookId })
+      body: JSON.stringify({ book_id: String(bookId) })
     });
     const result = await response.json();
     if (!response.ok || result?.success === false) {

@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
-import { AlertCircle, Calendar, CheckCircle2, Filter, Search, XCircle } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, Filter, Search, Unlock, XCircle } from 'lucide-react';
 
 export const AdminSoldUnsold: React.FC = () => {
-    const { books, booksTotal, games, booksPagination, agents, fetchBooks, updateBookStatus } = useAdmin();
+    const { books, booksTotal, games, booksPagination, agents, fetchBooks, updateBookStatus, unlockBookByAdmin } = useAdmin();
     const { showToast } = useToast();
     const [statusFilter, setStatusFilter] = useState<'All' | 'Sold' | 'Unsold' | 'Unsold by Admin'>('All');
     const [searchTerm, setSearchTerm] = useState('');
@@ -13,6 +13,7 @@ export const AdminSoldUnsold: React.FC = () => {
     const [agentFilter, setAgentFilter] = useState('All');
     const [pendingStatus, setPendingStatus] = useState<{ bookId: string; status: 'Sold' | 'Unsold' } | null>(null);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [unlockingBookId, setUnlockingBookId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchBooks(10, 0, false);
@@ -51,6 +52,19 @@ export const AdminSoldUnsold: React.FC = () => {
             showToast(error instanceof Error ? error.message : 'Failed to update book status.', 'error');
         } finally {
             setIsUpdating(false);
+        }
+    };
+
+    const handleUnlockBook = async (book: typeof books[number]) => {
+        setUnlockingBookId(book.id);
+        try {
+            await unlockBookByAdmin(book.apiId ?? book.id);
+            showToast(`Book ${book.id} unlocked for the agent.`, 'success');
+            await fetchBooks(10, booksPagination.currentPage, false);
+        } catch (error) {
+            showToast(error instanceof Error ? error.message : 'Failed to unlock book.', 'error');
+        } finally {
+            setUnlockingBookId(null);
         }
     };
 
@@ -156,6 +170,16 @@ export const AdminSoldUnsold: React.FC = () => {
                                                         >
                                                             {status === 'Unsold by Admin' ? 'Locked' : 'Unsold'}
                                                         </button>
+                                                        {status === 'Unsold by Admin' && (
+                                                            <button
+                                                                onClick={() => handleUnlockBook(book)}
+                                                                disabled={unlockingBookId === book.id}
+                                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-sky-50 text-sky-700 text-[9px] font-bold hover:bg-sky-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                            >
+                                                                <Unlock className="w-3 h-3" />
+                                                                {unlockingBookId === book.id ? 'Unlocking...' : 'Unlock'}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
