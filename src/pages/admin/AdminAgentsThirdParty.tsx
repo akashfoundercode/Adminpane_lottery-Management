@@ -31,6 +31,13 @@ export const AdminAgentsThirdParty: React.FC = () => {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
 
+  const normalizeContactNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    return digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+  };
+
+  const isValidContactNumber = (value: string) => /^\d{10}$/.test(normalizeContactNumber(value));
+
   // Filter Third Party Agents
   const filteredAgents = useMemo(() => {
     return agents.filter(a => {
@@ -55,8 +62,8 @@ export const AdminAgentsThirdParty: React.FC = () => {
       showToast('Please enter a valid email address.', 'error');
       return;
     }
-    if (!/^\+?[0-9\s-]{10,15}$/.test(mobile) || !/^\+?[0-9\s-]{10,15}$/.test(whatsapp)) {
-      showToast('Please enter valid mobile and WhatsApp numbers.', 'error');
+    if (!isValidContactNumber(mobile) || !isValidContactNumber(whatsapp)) {
+      showToast('Mobile and WhatsApp numbers must be exactly 10 digits.', 'error');
       return;
     }
     if (password.length < 6) {
@@ -93,8 +100,8 @@ export const AdminAgentsThirdParty: React.FC = () => {
     setSelectedAgent(agent);
     setName(agent.name);
     setEmail(agent.email);
-    setMobile(agent.mobile);
-    setWhatsapp(agent.whatsapp || agent.mobile || '');
+    setMobile(normalizeContactNumber(agent.mobile));
+    setWhatsapp(normalizeContactNumber(agent.whatsapp || agent.mobile || ''));
     setAddress(agent.address);
     setPassword('');
     setStatus(agent.status || 'Active');
@@ -107,8 +114,8 @@ export const AdminAgentsThirdParty: React.FC = () => {
       showToast('Please complete all agent fields.', 'error');
       return;
     }
-    if (!/^\S+@\S+\.\S+$/.test(email) || !/^\+?[0-9\s-]{10,15}$/.test(mobile) || !/^\+?[0-9\s-]{10,15}$/.test(whatsapp)) {
-      showToast('Please enter valid email, mobile and WhatsApp details.', 'error');
+    if (!/^\S+@\S+\.\S+$/.test(email) || !isValidContactNumber(mobile) || !isValidContactNumber(whatsapp)) {
+      showToast('Mobile and WhatsApp numbers must be exactly 10 digits.', 'error');
       return;
     }
     if (password && password.length < 6) {
@@ -279,6 +286,9 @@ export const AdminAgentsThirdParty: React.FC = () => {
                   required
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
+                  inputMode="numeric"
+                  maxLength={10}
+                  pattern="[0-9]{10}"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
                 />
               </div>
@@ -383,7 +393,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">WhatsApp Number *</label>
-                <input type="text" required value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+                <input type="text" required value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="numeric" maxLength={10} pattern="[0-9]{10}" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Address</label>
