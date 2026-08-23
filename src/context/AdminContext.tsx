@@ -1391,7 +1391,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const importBooks = async (gameId: string, file: File) => {
-    const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
+    const token = localStorage.getItem('admin_token');
+    if (!token) {
+      throw new Error('Admin session is missing. Please log in again.');
+    }
     const formData = new FormData();
     formData.append('game_id', gameId);
     formData.append('file', file);
@@ -1403,6 +1406,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const response = await fetch(apiUrl('/api/v1/admin/books/import'), {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: formData
@@ -1410,6 +1414,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (!response.ok) {
         const errorText = await response.text();
+        if (response.status === 401) {
+          setIsAdminAuthenticated(false);
+          setAdminUser(null);
+          localStorage.removeItem('admin_auth');
+          localStorage.removeItem('admin_profile');
+          localStorage.removeItem('admin_token');
+          throw new Error('Admin session expired. Please log in again.');
+        }
         let errMsg = 'Server responded with an error during book spreadsheet import.';
         try {
           const parsed = JSON.parse(errorText);
