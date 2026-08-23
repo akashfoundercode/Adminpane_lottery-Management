@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
-import { AlertCircle, Calendar, CheckCircle2, Filter, Search, Unlock, XCircle } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, Filter, RefreshCw, Search, Unlock, XCircle } from 'lucide-react';
+import { PageLoader } from '../../components/PageLoader';
 
 export const AdminSoldUnsold: React.FC = () => {
-    const { books, booksTotal, games, booksPagination, agents, fetchBooks, updateBookStatus, unlockBookByAdmin } = useAdmin();
+    const { books, booksTotal, games, booksPagination, agents, fetchBooks, updateBookStatus, unlockBookByAdmin, loadingBooks } = useAdmin();
     const { showToast } = useToast();
     const [statusFilter, setStatusFilter] = useState<'All' | 'Sold' | 'Unsold' | 'Unsold by Admin'>('All');
     const [searchTerm, setSearchTerm] = useState('');
@@ -16,8 +17,12 @@ export const AdminSoldUnsold: React.FC = () => {
     const [unlockingBookId, setUnlockingBookId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchBooks(10, 0, false);
-    }, []);
+        fetchBooks(10, 1, false);
+        const refreshInterval = window.setInterval(() => {
+            fetchBooks(10, currentPage, false);
+        }, 30000);
+        return () => window.clearInterval(refreshInterval);
+    }, [currentPage]);
 
     const getAgentName = (agentId?: string, agentName?: string) => {
         if (agentName) return agentName;
@@ -73,7 +78,10 @@ export const AdminSoldUnsold: React.FC = () => {
             <div className="space-y-6 font-sans">
                 <div>
                     <h2 className="text-[20px] font-bold text-text-primary font-display">Sold / Unsold Books</h2>
-                    <p className="text-xs text-text-secondary">Books updated by agents through the Sold or Unsold API</p>
+                    <p className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        Books updated by agents through the Sold or Unsold API
+                        {loadingBooks && <RefreshCw className="h-3 w-3 animate-spin" aria-label="Refreshing books" />}
+                    </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-4 rounded-xl border border-border-light shadow-sm">
@@ -114,7 +122,9 @@ export const AdminSoldUnsold: React.FC = () => {
                 </div>
 
                 <div className="bg-white rounded-xl border border-border-light shadow-sm overflow-hidden">
-                    {soldUnsoldHistory.length === 0 ? (
+                    {loadingBooks && books.length === 0 ? (
+                        <PageLoader />
+                    ) : soldUnsoldHistory.length === 0 ? (
                         <div className="p-8 text-center flex flex-col items-center">
                             <AlertCircle className="w-10 h-10 text-slate-300 mb-2" />
                             <p className="text-xs font-semibold text-text-primary">No Sold or Unsold books found</p>
