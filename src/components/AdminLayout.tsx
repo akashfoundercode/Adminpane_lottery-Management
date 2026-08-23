@@ -52,7 +52,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Book Assignment', path: '/admin/book-assignment', icon: UserPlus },
     { name: 'Assignment History', path: '/admin/assignment-history', icon: History },
     { name: 'Sold / Unsold Books', path: '/admin/sold-unsold', icon: History },
-    { name: 'Reopen Requests', path: '/admin/reopen-requests', icon: History },
     { name: 'First Party Agents', path: '/admin/agents/first-party', icon: Users },
     { name: 'Third Party Agents', path: '/admin/agents/third-party', icon: Users },
     { name: 'Agent Performance', path: '/admin/agent-performance', icon: TrendingUp },

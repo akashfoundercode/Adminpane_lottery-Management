@@ -9,7 +9,6 @@ export { default as AdminGenerateBooks } from '../../../pages/admin/AdminGenerat
 export { default as AdminBookAssignment } from '../../../pages/admin/AdminBookAssignment';
 export { default as AdminAssignmentHistory } from '../../../pages/admin/AdminAssignmentHistory';
 export { default as AdminSoldUnsold } from '../../../pages/admin/AdminSoldUnsold';
-export { default as AdminReopenRequests } from '../../../pages/admin/AdminReopenRequests';
 export { default as AdminAgentsFirstParty } from '../../../pages/admin/AdminAgentsFirstParty';
 export { default as AdminAgentsThirdParty } from '../../../pages/admin/AdminAgentsThirdParty';
 export { default as AdminAgentDetails } from '../../../pages/admin/AdminAgentDetails';
