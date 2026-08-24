@@ -1013,6 +1013,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
     };
     let response = await request(paths[0], 'PUT');
+    if (response.status === 404 || response.status === 405) response = await request(paths[0], 'POST');
     if (response.status === 404 || response.status === 405) response = await request(paths[1], 'PUT');
     if (response.status === 404 || response.status === 405) response = await request(paths[1], 'POST');
 
