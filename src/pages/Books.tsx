@@ -242,6 +242,7 @@ export const Books: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-border-light">
+                <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary">Sr. No.</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary">Book ID</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary">Game</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary text-center">Tickets</th>
@@ -255,13 +256,14 @@ export const Books: React.FC = () => {
             <tbody className="divide-y divide-border-light text-sm">
               {paginatedBooks.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-text-secondary">
+                  <td colSpan={9} className="p-8 text-center text-text-secondary">
                     No books matched your criteria.
                   </td>
                 </tr>
               ) : (
-                paginatedBooks.map((book) => (
+                paginatedBooks.map((book, index) => (
                   <tr key={book.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="p-4 font-semibold text-text-secondary">{offset + index + 1}</td>
                     <td className="p-4 font-mono font-bold text-text-primary">{book.id}</td>
                     <td className="p-4 font-semibold text-text-primary">{getGameName(book.gameId)}</td>
                     <td className="p-4 text-center font-medium text-text-secondary">{book.tickets.length}</td>
@@ -310,10 +312,13 @@ export const Books: React.FC = () => {
             No books matched your criteria.
           </div>
         ) : (
-          paginatedBooks.map((book) => (
+          paginatedBooks.map((book, index) => (
             <div key={book.id} className="premium-card p-4 bg-white border border-border-light shadow-sm space-y-3">
               <div className="flex justify-between items-center">
-                <span className="font-mono font-bold text-sm text-text-primary">{book.id}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-text-secondary">{offset + index + 1}.</span>
+                  <span className="font-mono font-bold text-sm text-text-primary">{book.id}</span>
+                </div>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(book.status)}`}>
                   {book.status === 'Unsold by Admin' && <Lock className="w-3 h-3 mr-1" />}
                   {book.status}
