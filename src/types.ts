@@ -166,3 +166,11 @@ export interface LiveBannerSettings {
   banners: string[];
   banner_ids?: Array<number | string>;
 }
+
+export interface StaticBanner {
+  id: string | number;
+  image: string;
+  title?: string;
+  link?: string;
+  status?: string;
+}

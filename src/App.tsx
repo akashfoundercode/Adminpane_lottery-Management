@@ -42,7 +42,8 @@ import {
   AdminReportsBooks,
   AdminReportsAgents,
   AdminReportsWinning,
-  AdminSettings
+  AdminSettings,
+  AdminStaticBanners
 } from './modules/admin/pages';
 
 function App() {
@@ -113,6 +114,7 @@ function App() {
                         <Route path="reports/agents" element={<AdminReportsAgents />} />
                         <Route path="reports/winning" element={<AdminReportsWinning />} />
                         <Route path="settings" element={<AdminSettings />} />
+                        <Route path="static-banners" element={<AdminStaticBanners />} />
                         <Route path="*" element={<Navigate to="dashboard" replace />} />
                       </Routes>
                     </AdminLayout>

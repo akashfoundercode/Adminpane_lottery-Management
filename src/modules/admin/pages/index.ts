@@ -22,3 +22,4 @@ export { default as AdminReportsBooks } from '../../../pages/admin/AdminReportsB
 export { default as AdminReportsAgents } from '../../../pages/admin/AdminReportsAgents';
 export { default as AdminReportsWinning } from '../../../pages/admin/AdminReportsWinning';
 export { default as AdminSettings } from '../../../pages/admin/AdminSettings';
+export { default as AdminStaticBanners } from '../../../pages/admin/AdminStaticBanners';

@@ -5,6 +5,7 @@ import GlassCard from './ui/GlassCard';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
 import { getPublicLiveBanners } from '../services/liveBannerService';
+import { getPublicStaticBanners } from '../services/staticBannerService';
 
 const CountdownTimer = ({ targetDate }) => {
   const [timeLeft, setTimeLeft] = useState({
@@ -58,6 +59,13 @@ const UpcomingDraws = () => {
   const [selectedDraw, setSelectedDraw] = useState(null);
   const [bannerSettings, setBannerSettings] = useState(null);
   const [isLoadingBanners, setIsLoadingBanners] = useState(false);
+  const [staticBanners, setStaticBanners] = useState([]);
+
+  useEffect(() => {
+    getPublicStaticBanners()
+      .then(setStaticBanners)
+      .catch(error => console.error('API Error fetching public static banners:', error));
+  }, []);
 
   const draws = [
     {
@@ -123,7 +131,9 @@ const UpcomingDraws = () => {
     setBannerSettings(null);
     setIsLoadingBanners(true);
     try {
-      const settings = await getPublicLiveBanners(draw.id);
+      const settings = draw.live
+        ? await getPublicLiveBanners(draw.id)
+        : { banners: (await getPublicStaticBanners()).map(banner => banner.image), youtube_live_url: '', facebook_live_url: '' };
       setBannerSettings(settings);
     } catch (error) {
       setBannerSettings({ error: error.message || 'Unable to load banners.' });
@@ -162,7 +172,7 @@ const UpcomingDraws = () => {
 
         {/* Draws Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
-          {draws.map((draw) => (
+          {draws.map((draw, drawIndex) => (
             <GlassCard
               key={draw.id}
               glowColor={draw.accentColor}
@@ -171,7 +181,7 @@ const UpcomingDraws = () => {
               {/* Prize Banner Image */}
               <div className="relative h-48 w-full overflow-hidden">
                 <img
-                  src={draw.image}
+                  src={!draw.live && staticBanners.length > 0 ? staticBanners[drawIndex % staticBanners.length].image : draw.image}
                   alt={draw.title}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                 />

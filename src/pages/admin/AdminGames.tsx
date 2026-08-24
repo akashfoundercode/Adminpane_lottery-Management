@@ -12,7 +12,7 @@ const LiveBannerModal: React.FC<{
   onClose: () => void;
   onSaved: () => void;
 }> = ({ gameId, gameName, onClose, onSaved }) => {
-  const { games, fetchLiveBanners, saveLiveBanners, deleteLiveBanner } = useAdmin();
+  const { games, fetchLiveBanners, saveLiveBanners, deleteLiveBanner, fetchStaticBanners, createStaticBanner, deleteStaticBanner } = useAdmin();
   const { showToast } = useToast();
   const [activeGameId, setActiveGameId] = useState(gameId);
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -22,8 +22,17 @@ const LiveBannerModal: React.FC<{
   const [bannerIds, setBannerIds] = useState<Array<number | string>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [bannerType, setBannerType] = useState<'live' | 'static'>('live');
+  const [staticBanners, setStaticBanners] = useState<Array<{ id: string | number; image: string; title?: string; link?: string }>>([]);
+  const [staticFile, setStaticFile] = useState<File | null>(null);
+  const [staticTitle, setStaticTitle] = useState('');
+  const [staticLink, setStaticLink] = useState('');
 
   React.useEffect(() => {
+    if (bannerType !== 'live' || !activeGameId) {
+      setLoading(false);
+      return;
+    }
     let mounted = true;
     fetchLiveBanners(activeGameId)
       .then(settings => {
@@ -36,7 +45,14 @@ const LiveBannerModal: React.FC<{
       .catch(error => showToast(error.message || 'Failed to load live banners.', 'error'))
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, [activeGameId]);
+  }, [activeGameId, bannerType]);
+
+  React.useEffect(() => {
+    if (bannerType !== 'static') return;
+    fetchStaticBanners()
+      .then(setStaticBanners)
+      .catch(error => showToast(error.message || 'Failed to load static banners.', 'error'));
+  }, [bannerType]);
 
   const handleFiles = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedFiles(Array.from(event.target.files || []));
@@ -80,6 +96,37 @@ const LiveBannerModal: React.FC<{
     }
   };
 
+  const handleStaticUpload = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!staticFile) {
+      showToast('Please select a static banner image.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await createStaticBanner(staticFile, staticTitle.trim(), staticLink.trim());
+      setStaticBanners(prev => [created, ...prev]);
+      setStaticFile(null);
+      setStaticTitle('');
+      setStaticLink('');
+      showToast('Static banner uploaded successfully.', 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to upload static banner.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteStaticBanner = async (id: string | number) => {
+    try {
+      await deleteStaticBanner(id);
+      setStaticBanners(prev => prev.filter(banner => banner.id !== id));
+      showToast('Static banner deleted successfully.', 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to delete static banner.', 'error');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-4 sm:p-8" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-5 sm:p-6 my-4">
@@ -89,62 +136,86 @@ const LiveBannerModal: React.FC<{
         <h2 className="text-[18px] font-bold text-text-primary font-display">Create Banner</h2>
         <p className="text-xs text-text-secondary mt-1 mb-6">Manage live links and banners for {games.find(game => game.id === activeGameId)?.name || gameName}</p>
 
-        {loading ? <PageLoader /> : (
-          <form onSubmit={handleSave} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Game</label>
-              <select value={activeGameId} onChange={event => setActiveGameId(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary">
-                {games.map(game => <option key={game.id} value={game.id}>{game.name} ({game.gameCode})</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">YouTube Live URL</label>
-              <input type="url" value={youtubeUrl} onChange={event => setYoutubeUrl(event.target.value)} placeholder="https://youtube.com/live/abc123" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Facebook Live URL</label>
-              <input type="url" value={facebookUrl} onChange={event => setFacebookUrl(event.target.value)} placeholder="https://facebook.com/example/live" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Live Banners</label>
-              <label className="flex items-center gap-2 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/60 rounded-xl px-4 py-4 cursor-pointer transition-colors">
-                <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="sr-only" />
-                <UploadCloud className="w-5 h-5 text-indigo-500" />
-                <span className="text-xs font-semibold text-text-primary">Select banner images</span>
-                <span className="text-[10px] text-text-secondary ml-auto">JPG, PNG, WEBP</span>
+        <div className="grid grid-cols-2 gap-2 mb-5 p-1 bg-slate-100 rounded-xl">
+          <button type="button" onClick={() => setBannerType('live')} className={`rounded-lg px-3 py-2 text-xs font-bold ${bannerType === 'live' ? 'bg-white text-indigo-700 shadow-sm' : 'text-text-secondary'}`}>Live Banner</button>
+          <button type="button" onClick={() => setBannerType('static')} className={`rounded-lg px-3 py-2 text-xs font-bold ${bannerType === 'static' ? 'bg-white text-indigo-700 shadow-sm' : 'text-text-secondary'}`}>Static Image</button>
+        </div>
+
+        {bannerType === 'static' ? (
+          <div className="space-y-4">
+            <form onSubmit={handleStaticUpload} className="space-y-3">
+              <label className="flex items-center justify-center min-h-24 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 text-xs font-semibold text-text-secondary cursor-pointer hover:border-indigo-400">
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setStaticFile(event.target.files?.[0] || null)} className="sr-only" />
+                {staticFile ? staticFile.name : 'Choose static image'}
               </label>
-              {selectedFiles.length > 0 && <p className="text-[10px] text-indigo-600 mt-2">{selectedFiles.map(file => file.name).join(', ')}</p>}
-            </div>
-
-            {existingBanners.length > 0 && (
+              <input value={staticTitle} onChange={event => setStaticTitle(event.target.value)} placeholder="Title (optional)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" />
+              <input type="url" value={staticLink} onChange={event => setStaticLink(event.target.value)} placeholder="Click URL (optional)" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs" />
+              <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"><UploadCloud className="w-3.5 h-3.5" />{saving ? 'Uploading...' : 'Upload Static Image'}</button>
+            </form>
+            {staticBanners.length > 0 && <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border-t border-border-light pt-4">{staticBanners.map(banner => <div key={String(banner.id)} className="relative group"><img src={banner.image} alt={banner.title || 'Static banner'} className="h-24 w-full object-cover rounded-lg border border-slate-200" /><button type="button" onClick={() => handleDeleteStaticBanner(banner.id)} aria-label="Delete static banner" className="absolute top-1 right-1 p-1 rounded-md bg-white/90 text-rose-600 opacity-0 group-hover:opacity-100"><Trash2 className="w-3.5 h-3.5" /></button></div>)}</div>}
+          </div>
+        ) : !activeGameId ? (
+          <div className="rounded-xl border border-sky-200 bg-sky-50 p-5 text-center text-xs text-sky-800">
+            No game live yet. Create a game first, then add its live banner and links here.
+          </div>
+        ) : loading ? <PageLoader /> : (
+          <>
+            <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <p className="block text-[10px] font-bold text-text-secondary uppercase mb-2">Current Banners</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {existingBanners.map((banner, index) => (
-                    <div key={`${banner}-${index}`} className="relative group">
-                      <img src={banner} alt={`Live banner ${index + 1}`} className="h-20 w-full object-cover rounded-lg border border-slate-200" />
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteBanner(index)}
-                        aria-label={`Delete banner ${index + 1}`}
-                        className="absolute top-1 right-1 p-1 rounded-md bg-white/90 text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Game</label>
+                <select value={activeGameId} onChange={event => setActiveGameId(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary">
+                  {games.map(game => <option key={game.id} value={game.id}>{game.name} ({game.gameCode})</option>)}
+                </select>
               </div>
-            )}
+              <div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">YouTube Live URL</label>
+                <input type="url" value={youtubeUrl} onChange={event => setYoutubeUrl(event.target.value)} placeholder="https://youtube.com/live/abc123" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Facebook Live URL</label>
+                <input type="url" value={facebookUrl} onChange={event => setFacebookUrl(event.target.value)} placeholder="https://facebook.com/example/live" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Live Banners</label>
+                <label className="flex items-center gap-2 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/60 rounded-xl px-4 py-4 cursor-pointer transition-colors">
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleFiles} className="sr-only" />
+                  <UploadCloud className="w-5 h-5 text-indigo-500" />
+                  <span className="text-xs font-semibold text-text-primary">Select banner images</span>
+                  <span className="text-[10px] text-text-secondary ml-auto">JPG, PNG, WEBP</span>
+                </label>
+                {selectedFiles.length > 0 && <p className="text-[10px] text-indigo-600 mt-2">{selectedFiles.map(file => file.name).join(', ')}</p>}
+              </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t border-border-light">
-              <button type="button" onClick={onClose} className="px-4 py-2 border border-border-light bg-white rounded-xl text-xs font-semibold text-text-secondary hover:bg-slate-50">Cancel</button>
-              <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm">
-                <Save className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Banners'}
-              </button>
-            </div>
-          </form>
+              {existingBanners.length > 0 && (
+                <div>
+                  <p className="block text-[10px] font-bold text-text-secondary uppercase mb-2">Current Banners</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {existingBanners.map((banner, index) => (
+                      <div key={`${banner}-${index}`} className="relative group">
+                        <img src={banner} alt={`Live banner ${index + 1}`} className="h-20 w-full object-cover rounded-lg border border-slate-200" />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBanner(index)}
+                          aria-label={`Delete banner ${index + 1}`}
+                          className="absolute top-1 right-1 p-1 rounded-md bg-white/90 text-rose-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-border-light">
+                <button type="button" onClick={onClose} className="px-4 py-2 border border-border-light bg-white rounded-xl text-xs font-semibold text-text-secondary hover:bg-slate-50">Cancel</button>
+                <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm">
+                  <Save className="w-4 h-4" />
+                  {saving ? 'Saving...' : 'Save Banners'}
+                </button>
+              </div>
+            </form>
+          </>
         )}
       </div>
     </div>
@@ -278,9 +349,8 @@ export const AdminGames: React.FC = () => {
           </Link>
           <button
             type="button"
-            onClick={() => games[0] && setBannerGame({ id: games[0].id, name: games[0].name })}
-            disabled={games.length === 0}
-            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+            onClick={() => setBannerGame({ id: games[0]?.id || '', name: games[0]?.name || '' })}
+            className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
           >
             <UploadCloud className="w-4 h-4" />
             <span>Create Banner</span>
@@ -404,6 +474,14 @@ export const AdminGames: React.FC = () => {
                   {/* ACTIONS ROW */}
                   <div className="flex items-center justify-between pt-2 border-t border-border-light mt-auto">
                     <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setBannerGame({ id: game.id, name: game.name })}
+                        title="Manage live and static banners"
+                        className="text-text-secondary hover:text-indigo-600 transition-colors"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={e => handleStatusToggle(e, game.id, game.name)}
                         title="Toggle Status"

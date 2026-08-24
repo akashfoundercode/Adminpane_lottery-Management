@@ -20,7 +20,8 @@ import {
   Bell,
   ChevronDown,
   LogOut,
-  Sparkles
+  Sparkles,
+  ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -59,7 +60,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Sales Reports', path: '/admin/reports/sales', icon: BarChart2 },
     { name: 'Book Reports', path: '/admin/reports/books', icon: PieChart },
     { name: 'Agent Reports', path: '/admin/reports/agents', icon: LineChart },
-    { name: 'Settings', path: '/admin/settings', icon: Settings }
+    { name: 'Settings', path: '/admin/settings', icon: Settings },
+    { name: 'Static Banners', path: '/admin/static-banners', icon: ImageIcon }
   ];
 
   const isActive = (path: string) => {

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination, ContactSettings, LiveBannerSettings, GamePrize } from '../types';
+import { Game, Agent, Book, Winning, Prize, Result, ResultPrize, AssignmentHistory, ListPagination, ContactSettings, LiveBannerSettings, GamePrize, StaticBanner } from '../types';
 import { apiUrl } from '../config/api';
 
 type AgentUpdate = Partial<Agent> & { password?: string };
@@ -79,6 +79,10 @@ interface AdminContextType {
   fetchLiveBanners: (gameId: string) => Promise<LiveBannerSettings>;
   saveLiveBanners: (gameId: string, settings: { youtube_live_url: string; facebook_live_url: string; banners: File[]; existing_banners?: string[] }) => Promise<LiveBannerSettings>;
   deleteLiveBanner: (gameId: string, bannerId: number | string) => Promise<void>;
+  fetchStaticBanners: () => Promise<StaticBanner[]>;
+  createStaticBanner: (file: File, title?: string, link?: string) => Promise<StaticBanner>;
+  updateStaticBanner: (id: string | number, data: { file?: File; title?: string; link?: string; status?: string }) => Promise<StaticBanner>;
+  deleteStaticBanner: (id: string | number) => Promise<void>;
 }
 
 export interface GameLockStatus {
@@ -1031,6 +1035,69 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!response.ok || json?.success === false) {
       throw new Error(extractApiErrorMessage(json, 'Failed to delete live banner.'));
     }
+  };
+
+  const getStaticBannerList = (json: any): StaticBanner[] => {
+    const payload = json?.data && !Array.isArray(json.data) ? json.data : json;
+    const items = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : [];
+    return items.map((item: any) => ({
+      id: item.id ?? item.banner_id,
+      image: getFullImageUrl(item.image_url || item.image || item.url || item.path),
+      title: item.title || item.name || '',
+      link: item.link || item.redirect_url || '',
+      status: item.status || 'active'
+    }));
+  };
+
+  const fetchStaticBanners = async (): Promise<StaticBanner[]> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const response = await fetch(apiUrl('/api/v1/admin/static-banners'), {
+      headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok || json?.success === false) throw new Error(extractApiErrorMessage(json, 'Failed to load static banners.'));
+    return getStaticBannerList(json);
+  };
+
+  const createStaticBanner = async (file: File, title = '', link = ''): Promise<StaticBanner> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('title', title);
+    formData.append('link', link);
+    const response = await fetch(apiUrl('/api/v1/admin/static-banners'), {
+      method: 'POST', headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }, body: formData
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok || json?.success === false) throw new Error(extractApiErrorMessage(json, 'Failed to upload static banner.'));
+    return getStaticBannerList({ data: [json?.data || json] })[0];
+  };
+
+  const updateStaticBanner = async (id: string | number, data: { file?: File; title?: string; link?: string; status?: string }): Promise<StaticBanner> => {
+    const token = localStorage.getItem('admin_token') || '';
+    const formData = new FormData();
+    if (data.file) formData.append('image', data.file);
+    if (data.title !== undefined) formData.append('title', data.title);
+    if (data.link !== undefined) formData.append('link', data.link);
+    if (data.status !== undefined) formData.append('status', data.status);
+    const path = apiUrl(`/api/v1/admin/static-banners/${encodeURIComponent(String(id))}`);
+    const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` };
+    let response = await fetch(path, { method: 'POST', headers, body: formData });
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(path, { method: 'PUT', headers, body: formData });
+    }
+    const json = await response.json().catch(() => null);
+    if (!response.ok || json?.success === false) throw new Error(extractApiErrorMessage(json, 'Failed to update static banner.'));
+    return getStaticBannerList({ data: [json?.data || json] })[0];
+  };
+
+  const deleteStaticBanner = async (id: string | number) => {
+    const token = localStorage.getItem('admin_token') || '';
+    const response = await fetch(apiUrl(`/api/v1/admin/static-banners/${encodeURIComponent(String(id))}`), {
+      method: 'DELETE', headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}` }
+    });
+    const json = await response.json().catch(() => null);
+    if (!response.ok || json?.success === false) throw new Error(extractApiErrorMessage(json, 'Failed to delete static banner.'));
   };
 
   const saveContactSettings = async (settings: ContactSettings) => {
@@ -2001,7 +2068,11 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       saveContactSettings,
       fetchLiveBanners,
       saveLiveBanners,
-      deleteLiveBanner
+      deleteLiveBanner,
+      fetchStaticBanners,
+      createStaticBanner,
+      updateStaticBanner,
+      deleteStaticBanner
     }}>
       {children}
     </AdminContext.Provider>
