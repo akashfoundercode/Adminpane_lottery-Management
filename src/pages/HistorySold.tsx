@@ -53,7 +53,7 @@ export const HistorySold: React.FC = () => {
         if (!(b as any).soldDate) return false;
         const soldTime = new Date((b as any).soldDate);
         const diffMs = now.getTime() - soldTime.getTime();
-        
+
         if (dateFilter === '7days') {
           return diffMs <= 7 * 24 * 60 * 60 * 1000;
         } else if (dateFilter === '30days') {
@@ -171,6 +171,7 @@ export const HistorySold: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50 border-b border-border-light">
+                    <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary">Sr. No.</th>
                     <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary">Book ID</th>
                     <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary">Game</th>
                     <th className="p-4 text-xs font-bold uppercase tracking-wider text-text-secondary">Sold Date</th>
@@ -180,8 +181,9 @@ export const HistorySold: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-light text-sm">
-                  {paginatedBooks.map((book) => (
+                  {paginatedBooks.map((book, index) => (
                     <tr key={book.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="p-4 font-semibold text-text-secondary">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                       <td className="p-4 font-mono font-bold text-text-primary">{book.id}</td>
                       <td className="p-4 font-semibold text-text-primary">{getGameName(book.gameId)}</td>
                       <td className="p-4 text-text-secondary text-xs">

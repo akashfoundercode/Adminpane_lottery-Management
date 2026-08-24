@@ -71,11 +71,10 @@ export const AdminBooks: React.FC = () => {
             <div className="flex flex-wrap gap-2 bg-white px-4 pt-4 pb-2 rounded-xl border border-border-light shadow-sm">
                 <button
                     onClick={() => { setGameFilter('All'); resetList(); }}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                        gameFilter === 'All'
+                    className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${gameFilter === 'All'
                             ? 'bg-[#6366f1] text-white'
                             : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
-                    }`}
+                        }`}
                 >
                     All Games
                 </button>
@@ -83,11 +82,10 @@ export const AdminBooks: React.FC = () => {
                     <button
                         key={game.id}
                         onClick={() => { setGameFilter(game.id); resetList(); }}
-                        className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
-                            gameFilter === game.id
+                        className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${gameFilter === game.id
                                 ? 'bg-[#6366f1] text-white'
                                 : 'bg-slate-100 text-text-secondary hover:bg-slate-200'
-                        }`}
+                            }`}
                     >
                         {game.name}
                     </button>
@@ -127,9 +125,9 @@ export const AdminBooks: React.FC = () => {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
-                            <thead><tr className="bg-slate-50/50 border-b border-border-light text-[10px] text-text-secondary uppercase tracking-wider font-bold"><th className="py-3.5 px-4">Book ID</th><th className="py-3.5 px-4">Game</th><th className="py-3.5 px-4">Serial Number</th><th className="py-3.5 px-4 text-center">Book No</th><th className="py-3.5 px-4 text-right">Total Tickets</th><th className="py-3.5 px-4 text-right">Sold Tickets</th><th className="py-3.5 px-4 text-right">Unsold Tickets</th><th className="py-3.5 px-4">Status</th><th className="py-3.5 px-4">Assigned Agent</th><th className="py-3.5 px-4 text-center">Action</th></tr></thead>
+                            <thead><tr className="bg-slate-50/50 border-b border-border-light text-[10px] text-text-secondary uppercase tracking-wider font-bold"><th className="py-3.5 px-4">Sr. No.</th><th className="py-3.5 px-4">Book ID</th><th className="py-3.5 px-4">Game</th><th className="py-3.5 px-4 text-center">Book No</th><th className="py-3.5 px-4 text-right">Total Tickets</th><th className="py-3.5 px-4 text-right">Sold Tickets</th><th className="py-3.5 px-4 text-right">Unsold Tickets</th><th className="py-3.5 px-4">Status</th><th className="py-3.5 px-4">Assigned Agent</th><th className="py-3.5 px-4 text-center">Action</th></tr></thead>
                             <tbody className="divide-y divide-border-light">
-                                {filteredBooks.map(book => <tr key={book.id} className="hover:bg-slate-50/30"><td className="py-3 px-4 font-bold text-text-primary">{book.id}</td><td className="py-3 px-4 font-semibold text-text-primary">{book.gameName}</td><td className="py-3 px-4 font-mono text-text-secondary">{book.serialNumber || '-'}</td><td className="py-3 px-4 text-center text-text-secondary">{book.bookNumber || '-'}</td><td className="py-3 px-4 text-right text-text-secondary">{book.tickets.length}</td><td className="py-3 px-4 text-right font-semibold text-emerald-600">{book.status === 'Sold' ? book.tickets.length : 0}</td><td className="py-3 px-4 text-right font-semibold text-rose-600">{book.status === 'Unsold' || book.status === 'Unsold by Admin' ? book.tickets.length : 0}</td><td className="py-3 px-4"><span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${book.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' : book.status === 'Available' ? 'bg-blue-100 text-blue-800' : book.status === 'Unsold' ? 'bg-amber-100 text-amber-800' : book.status === 'Assigned' || book.status === 'In Progress' ? 'bg-purple-100 text-purple-800' : 'bg-rose-100 text-rose-800'}`}>{book.status}</span></td><td className="py-3 px-4 text-text-primary">{book.agentName || '-'}</td><td className="py-3 px-4 text-center"><Link to={`/admin/books/${book.id}`} title="View Details" className="inline-flex p-1.5 text-text-secondary hover:text-indigo-600"><Eye className="w-4 h-4" /></Link></td></tr>)}
+                                {filteredBooks.map((book, index) => <tr key={book.id} className="hover:bg-slate-50/30"><td className="py-3 px-4 font-semibold text-text-secondary">{(currentPage - 1) * LIMIT + index + 1}</td><td className="py-3 px-4 font-bold text-text-primary">{book.id}</td><td className="py-3 px-4 font-semibold text-text-primary">{book.gameName}</td><td className="py-3 px-4 text-center text-text-secondary">{book.bookNumber || '-'}</td><td className="py-3 px-4 text-right text-text-secondary">{book.tickets.length}</td><td className="py-3 px-4 text-right font-semibold text-emerald-600">{book.status === 'Sold' ? book.tickets.length : 0}</td><td className="py-3 px-4 text-right font-semibold text-rose-600">{book.status === 'Unsold' || book.status === 'Unsold by Admin' ? book.tickets.length : 0}</td><td className="py-3 px-4"><span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${book.status === 'Sold' ? 'bg-emerald-100 text-emerald-800' : book.status === 'Available' ? 'bg-blue-100 text-blue-800' : book.status === 'Unsold' ? 'bg-amber-100 text-amber-800' : book.status === 'Assigned' || book.status === 'In Progress' ? 'bg-purple-100 text-purple-800' : 'bg-rose-100 text-rose-800'}`}>{book.status}</span></td><td className="py-3 px-4 text-text-primary">{book.agentName || '-'}</td><td className="py-3 px-4 text-center"><Link to={`/admin/books/${book.id}`} title="View Details" className="inline-flex p-1.5 text-text-secondary hover:text-indigo-600"><Eye className="w-4 h-4" /></Link></td></tr>)}
                             </tbody>
                         </table>
                     </div>
@@ -142,11 +140,10 @@ export const AdminBooks: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <button onClick={handleWindowPrev} disabled={windowStart === 1} className="px-2.5 py-1.5 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
                             {visiblePages.map(page => (
-                                <button key={page} onClick={() => goToPage(page)} className={`px-2.5 py-1.5 border rounded-lg text-[10px] font-semibold transition-colors ${
-                                    page === currentPage
+                                <button key={page} onClick={() => goToPage(page)} className={`px-2.5 py-1.5 border rounded-lg text-[10px] font-semibold transition-colors ${page === currentPage
                                         ? 'bg-indigo-600 text-white border-indigo-600'
                                         : 'border-border-light bg-white text-text-primary hover:bg-slate-50'
-                                }`}>{page}</button>
+                                    }`}>{page}</button>
                             ))}
                             <button onClick={handleWindowNext} disabled={windowStart + PAGE_WINDOW > totalPages} className="px-2.5 py-1.5 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
                         </div>
