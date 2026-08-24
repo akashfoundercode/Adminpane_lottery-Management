@@ -87,8 +87,8 @@ export const AdminSoldUnsold: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-4 rounded-xl border border-border-light shadow-sm">
-                    <div className="relative">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 inset-y-0 my-auto" />
+                    <div className="relative self-start">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                             value={searchTerm}
                             onChange={event => setSearchTerm(event.target.value)}
@@ -96,19 +96,19 @@ export const AdminSoldUnsold: React.FC = () => {
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-text-primary"
                         />
                     </div>
-                    <div className="relative">
+                    <div className="relative self-start">
                         <select value={gameFilter} onChange={event => setGameFilter(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-9 py-2 text-xs appearance-none text-text-primary">
                             <option value="All">All Games</option>
                             {games.map(game => <option key={game.id} value={game.name}>{game.name}</option>)}
                         </select>
-                        <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 inset-y-0 my-auto pointer-events-none" />
+                        <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
-                    <div className="relative">
+                    <div className="relative self-start">
                         <select value={agentFilter} onChange={event => setAgentFilter(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-9 py-2 text-xs appearance-none text-text-primary">
                             <option value="All">All Agents</option>
                             {agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
                         </select>
-                        <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 inset-y-0 my-auto pointer-events-none" />
+                        <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
                     <div className="flex gap-1 bg-slate-50 border border-slate-200 rounded-xl p-1">
                         {(['All', 'Sold', 'Unsold', 'Unsold by Admin'] as const).map(status => (

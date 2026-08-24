@@ -6,7 +6,7 @@ import { Book } from '../../types';
 import { apiUrl } from '../../config/api';
 
 export const AdminBookAssignment: React.FC = () => {
-  const { games, books, agents, assignBooks, revokeAssignment } = useAdmin();
+  const { games, books, agents, assignBooks, revokeAssignment, fetchGameLockStatus } = useAdmin();
   const { showToast } = useToast();
 
   const [selectedGameId, setSelectedGameId] = useState('');
@@ -16,6 +16,7 @@ export const AdminBookAssignment: React.FC = () => {
   const [bookSearchTerm, setBookSearchTerm] = useState('');
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(false);
+  const [gameWindowExpired, setGameWindowExpired] = useState(false);
 
   // Derived agent
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
@@ -25,11 +26,19 @@ export const AdminBookAssignment: React.FC = () => {
     if (!selectedGameId) { setAvailableBooks([]); return; }
     const token = localStorage.getItem('admin_token') || '';
     setLoadingBooks(true);
-    fetch(apiUrl(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=200`), {
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-    })
-      .then(r => r.json())
-      .then(json => {
+    setGameWindowExpired(false);
+    Promise.all([
+      fetch(apiUrl(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=200`), {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      }).then(r => r.json()),
+      fetchGameLockStatus(selectedGameId)
+    ])
+      .then(([json, lockStatus]) => {
+        if (lockStatus.is_locked) {
+          setGameWindowExpired(true);
+          setAvailableBooks([]);
+          return;
+        }
         const raw: any[] = Array.isArray(json.data?.data) ? json.data.data
           : Array.isArray(json.data) ? json.data : [];
         const mapped: Book[] = raw
@@ -56,7 +65,10 @@ export const AdminBookAssignment: React.FC = () => {
           }));
         setAvailableBooks(mapped);
       })
-      .catch(() => setAvailableBooks([]))
+      .catch(() => {
+        setAvailableBooks([]);
+        setGameWindowExpired(false);
+      })
       .finally(() => setLoadingBooks(false));
   }, [selectedGameId]);
 
@@ -91,6 +103,10 @@ export const AdminBookAssignment: React.FC = () => {
     e.preventDefault();
     if (!selectedGameId) {
       showToast('Please select a game.', 'error');
+      return;
+    }
+    if (gameWindowExpired) {
+      showToast('This game\'s 1-hour live update window has expired. Select a new game to assign books.', 'error');
       return;
     }
     if (selectedBookIds.length === 0) {
@@ -187,6 +203,10 @@ export const AdminBookAssignment: React.FC = () => {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-[160px] overflow-y-auto space-y-1.5">
                   {loadingBooks ? (
                     <div className="text-center py-6 text-text-secondary text-[11px] italic">Loading books...</div>
+                  ) : gameWindowExpired ? (
+                    <div className="text-center py-6 text-rose-600 text-[11px] font-semibold">
+                      This game's 1-hour live update window has expired. Select a new game.
+                    </div>
                   ) : availableBooks.length === 0 ? (
                     <div className="text-center py-6 text-text-secondary text-[11px] italic">
                       No available books found. Upload books first!
