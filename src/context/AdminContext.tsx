@@ -119,7 +119,9 @@ const EMPTY_CONTACT_SETTINGS: ContactSettings = {
 };
 
 const readPagination = (json: any, itemCount: number, limit: number, offset: number): ListPagination => {
-  const meta = json?.data && !Array.isArray(json.data) ? json.data : json;
+  const meta = json?.pagination
+    || json?.data?.pagination
+    || (json?.data && !Array.isArray(json.data) ? json.data : json);
   const total = Number(meta?.total ?? meta?.total_count ?? meta?.total_items ?? offset + itemCount);
   const perPage = Number(meta?.per_page ?? meta?.perPage ?? limit);
   const currentPage = Number(meta?.current_page ?? Math.floor(offset / limit) + 1);
@@ -744,7 +746,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setLoadingHistory(true);
     try {
       const gameParam = gameId ? `&game_id=${gameId}` : '';
-      const response = await fetch(apiUrl(`/api/v1/admin/book-assignments/history?limit=${limit}&offset=${offset}${gameParam}`), {
+      const page = Math.floor(offset / limit) + 1;
+      const response = await fetch(apiUrl(`/api/v1/admin/book-assignments/history?limit=${limit}&page=${page}&offset=${offset}${gameParam}`), {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -765,6 +768,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (json.success) {
           const mappedHistory: AssignmentHistory[] = rawHistory.map((h: any) => {
             const bookCode = h.book?.book_id || h.book_id || String(h.book_id || '');
+            const serialNumber = h.book?.serial_number || h.book?.serialNumber || h.serial_number || h.serialNumber || '';
             const bookName = h.book?.book_name || h.book?.name || h.book_name || bookCode;
             const gameName = h.game?.game_name
               || h.book?.game?.game_name
@@ -787,6 +791,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             return {
               id: String(h.id),
               bookId: bookCode,
+              serialNumber: String(serialNumber),
               bookName,
               gameName: gameName,
               agentName: agentName,
@@ -794,6 +799,8 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               agentType: agentType as any,
               assignedDate: h.assigned_at || h.assigned_date || h.created_at || '',
               expiryDate: h.expiry_at || h.expiry_date || '',
+              soldDate: h.sold_at || h.book?.sold_at || '',
+              unsoldDate: h.unsold_at || h.book?.unsold_at || '',
               status: mappedStatus
             };
           });
@@ -1130,7 +1137,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fetchGames();
       fetchBooks(50, 1, false);
       fetchAgents();
-      fetchAssignmentHistory();
+      fetchAssignmentHistory(10, 0, false);
       fetchResults();
       fetchContactSettings();
     }
@@ -1139,7 +1146,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (!isAdminAuthenticated) return;
 
-    const refreshBooks = () => fetchBooks(50, 1, false);
+    const refreshBooks = () => fetchBooks(50, 1, true);
     const interval = setInterval(refreshBooks, 30000);
     return () => clearInterval(interval);
   }, [isAdminAuthenticated]);
@@ -1566,7 +1573,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Reload lists to sync live state
       await fetchBooks();
       await fetchGames();
-      await fetchAssignmentHistory();
+      await fetchAssignmentHistory(10, 0, false);
     } catch (err: any) {
       console.error('API Error in assignBooks:', err);
       throw new Error(err.message || 'API connection failed. Please check if server is running.');
@@ -1594,6 +1601,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const log: AssignmentHistory = {
         id: `AH${String(assignmentHistory.length + 1).padStart(3, '0')}`,
         bookId,
+        serialNumber: oldBook.serialNumber || '',
         gameName: oldBook.gameName || '',
         agentName: oldBook.agentName || '',
         agentType: 'First Party', // placeholder
@@ -1643,7 +1651,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       status: updatedStatus,
       ...(updatedStatus === 'Sold' ? { soldDate: result?.data?.sold_at || new Date().toISOString() } : updatedStatus === 'Unsold' ? { unsoldDate: result?.data?.unsold_at || new Date().toISOString() } : {})
     } : item));
-    await fetchBooks();
+    await fetchBooks(50, 1, true);
   };
 
   const markBooksUnsoldByAdmin = async (gameId: string) => {
@@ -1658,7 +1666,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!response.ok || result?.success === false) {
       throw new Error(result?.message || 'Failed to mark books as Unsold by Admin.');
     }
-    await fetchBooks();
+    await fetchBooks(50, 1, true);
   };
 
   const fetchGameLockStatus = async (gameId: string): Promise<GameLockStatus> => {
@@ -1691,7 +1699,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       throw new Error(result?.message || 'Failed to mark book as unsold by admin.');
     }
 
-    await fetchBooks();
+    await fetchBooks(50, 1, true);
   };
 
   // Agent CRUD

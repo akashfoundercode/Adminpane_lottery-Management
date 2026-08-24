@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { Sparkles, Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { FieldError } from '../../components/ui/FieldError';
 
 export const AdminLogin: React.FC = () => {
   const { adminLogin } = useAdmin();
@@ -13,13 +14,26 @@ export const AdminLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
+
+  const validateEmail = (value: string) => {
+    if (!value.trim()) return 'Email is required.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())) return 'Enter a valid email address.';
+    return '';
+  };
+
+  const validate = () => {
+    const nextErrors = {
+      email: validateEmail(email) || undefined,
+      password: password ? undefined : 'Password is required.'
+    };
+    setErrors(nextErrors);
+    return !nextErrors.email && !nextErrors.password;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      showToast('Please fill in all fields.', 'error');
-      return;
-    }
+    if (!validate()) return;
 
     setIsLoading(true);
     try {
@@ -31,7 +45,7 @@ export const AdminLogin: React.FC = () => {
         showToast('Invalid email or password.', 'error');
       }
     } catch (err: any) {
-      showToast(err.message || 'An error occurred during login.', 'error');
+      setErrors({ form: err.message || 'An error occurred during login.' });
     } finally {
       setIsLoading(false);
     }
@@ -68,13 +82,16 @@ export const AdminLogin: React.FC = () => {
                   id="email"
                   name="email"
                   type="email"
-                  required
+                  required={false}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-text-primary placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
+                  onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({ ...prev, email: undefined, form: undefined })); }}
+                  onBlur={() => setErrors(prev => ({ ...prev, email: validateEmail(email) || undefined }))}
+                  aria-invalid={Boolean(errors.email)}
+                  className={`block w-full pl-9 pr-3 py-2.5 bg-slate-50 border rounded-xl text-xs text-text-primary placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all ${errors.email ? 'border-rose-400' : 'border-slate-200'}`}
                   placeholder="admin@gmail.com"
                 />
               </div>
+              <FieldError message={errors.email} />
             </div>
 
             {/* PASSWORD FIELD */}
@@ -90,10 +107,12 @@ export const AdminLogin: React.FC = () => {
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
-                  required
+                  required={false}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-text-primary placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all"
+                  onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined, form: undefined })); }}
+                  onBlur={() => setErrors(prev => ({ ...prev, password: password ? undefined : 'Password is required.' }))}
+                  aria-invalid={Boolean(errors.password)}
+                  className={`block w-full pl-9 pr-10 py-2.5 bg-slate-50 border rounded-xl text-xs text-text-primary placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all ${errors.password ? 'border-rose-400' : 'border-slate-200'}`}
                   placeholder="••••••••"
                 />
                 <button
@@ -104,7 +123,10 @@ export const AdminLogin: React.FC = () => {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              <FieldError message={errors.password} />
             </div>
+
+            <FieldError message={errors.form} />
 
             {/* SIGN IN BUTTON */}
             <div>

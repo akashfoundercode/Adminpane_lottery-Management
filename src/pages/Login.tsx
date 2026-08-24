@@ -4,6 +4,7 @@ import { useAgent } from '../context/AgentContext';
 import { useToast } from '../context/ToastContext';
 import { Eye, EyeOff, Lock, User, ShieldCheck, Ticket } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { FieldError } from '../components/ui/FieldError';
 
 export const Login: React.FC = () => {
   const { login } = useAgent();
@@ -15,13 +16,20 @@ export const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<{ agentId?: string; password?: string; form?: string }>({});
+
+  const validate = () => {
+    const nextErrors = {
+      agentId: agentId.trim() ? undefined : 'Agent ID or mobile number is required.',
+      password: password.trim() ? undefined : 'Password is required.'
+    };
+    setErrors(nextErrors);
+    return !nextErrors.agentId && !nextErrors.password;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agentId.trim() || !password.trim()) {
-      showToast('Please enter both Agent ID and Password.', 'warning');
-      return;
-    }
+    if (!validate()) return;
 
     setIsLoading(true);
     try {
@@ -30,10 +38,10 @@ export const Login: React.FC = () => {
         showToast('Welcome back, Rajesh!', 'success');
         navigate('/agent/dashboard');
       } else {
-        showToast('Invalid Agent ID or Password.', 'error');
+        setErrors({ form: 'Invalid Agent ID or Password.' });
       }
     } catch (err) {
-      showToast('Something went wrong. Please try again.', 'error');
+      setErrors({ form: 'Something went wrong. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -108,12 +116,15 @@ export const Login: React.FC = () => {
                   id="agentId"
                   type="text"
                   value={agentId}
-                  onChange={(e) => setAgentId(e.target.value)}
+                  onChange={(e) => { setAgentId(e.target.value); setErrors(prev => ({ ...prev, agentId: undefined, form: undefined })); }}
+                  onBlur={() => setErrors(prev => ({ ...prev, agentId: agentId.trim() ? undefined : 'Agent ID or mobile number is required.' }))}
+                  aria-invalid={Boolean(errors.agentId)}
                   placeholder="e.g. AG1001"
-                  className="w-full pl-10 pr-4 py-2.5 bg-bg-app border border-border-light rounded-xl text-sm text-text-primary placeholder-gray-400 focus:outline-none focus:border-brand-emerald transition-colors"
-                  required
+                  className={`w-full pl-10 pr-4 py-2.5 bg-bg-app border rounded-xl text-sm text-text-primary placeholder-gray-400 focus:outline-none focus:border-brand-emerald transition-colors ${errors.agentId ? 'border-rose-400' : 'border-border-light'}`}
+                  required={false}
                 />
               </div>
+              <FieldError message={errors.agentId} />
             </div>
 
             <div>
@@ -135,10 +146,12 @@ export const Login: React.FC = () => {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setErrors(prev => ({ ...prev, password: undefined, form: undefined })); }}
+                  onBlur={() => setErrors(prev => ({ ...prev, password: password.trim() ? undefined : 'Password is required.' }))}
+                  aria-invalid={Boolean(errors.password)}
                   placeholder="••••••••"
                   className="w-full pl-10 pr-10 py-2.5 bg-bg-app border border-border-light rounded-xl text-sm text-text-primary placeholder-gray-400 focus:outline-none focus:border-brand-emerald transition-colors"
-                  required
+                  required={false}
                 />
                 <button
                   type="button"
@@ -148,7 +161,10 @@ export const Login: React.FC = () => {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <FieldError message={errors.password} />
             </div>
+
+            <FieldError message={errors.form} />
 
             {/* Remember Me Toggle */}
             <div className="flex items-center justify-between pt-1">

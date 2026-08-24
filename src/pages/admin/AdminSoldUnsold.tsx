@@ -19,9 +19,9 @@ export const AdminSoldUnsold: React.FC = () => {
     const [unlockingBookId, setUnlockingBookId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchBooks(10, 1, false);
+        fetchBooks(200, 1, false);
         const refreshInterval = window.setInterval(() => {
-            fetchBooks(10, currentPageRef.current, false);
+            fetchBooks(200, currentPageRef.current, false);
         }, 30000);
         return () => window.clearInterval(refreshInterval);
     }, []);
@@ -142,9 +142,10 @@ export const AdminSoldUnsold: React.FC = () => {
                             <table className="w-full text-left border-collapse text-xs">
                                 <thead>
                                     <tr className="bg-slate-50/50 border-b border-border-light text-[10px] text-text-secondary uppercase tracking-wider font-bold">
+                                        <th className="py-3.5 px-4">S. No.</th>
                                         <th className="py-3.5 px-4">Agent Name</th>
-                                        <th className="py-3.5 px-4">Agent ID</th>
                                         <th className="py-3.5 px-4">Book ID</th>
+                                        <th className="py-3.5 px-4">Serial Number</th>
                                         <th className="py-3.5 px-4">Book Name</th>
                                         <th className="py-3.5 px-4">Game Name</th>
                                         <th className="py-3.5 px-4">Updated Date</th>
@@ -153,13 +154,14 @@ export const AdminSoldUnsold: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border-light">
-                                    {soldUnsoldHistory.map(book => {
+                                    {soldUnsoldHistory.map((book, index) => {
                                         const status = book.status;
                                         return (
                                             <tr key={book.id} className="hover:bg-slate-50/30">
+                                                <td className="py-3 px-4 font-semibold text-text-secondary">{index + 1}</td>
                                                 <td className="py-3 px-4 font-semibold text-text-primary">{getAgentName(book.agentId, book.agentName)}</td>
-                                                <td className="py-3 px-4 font-mono text-text-secondary">{book.agentId || '-'}</td>
                                                 <td className="py-3 px-4 font-mono font-bold text-indigo-600">{book.id}</td>
+                                                <td className="py-3 px-4 font-mono text-text-secondary">{book.serialNumber || '-'}</td>
                                                 <td className="py-3 px-4 font-medium text-text-primary">{book.bookName || book.id}</td>
                                                 <td className="py-3 px-4 text-text-primary">{book.gameName || '-'}</td>
                                                 <td className="py-3 px-4 text-text-secondary">

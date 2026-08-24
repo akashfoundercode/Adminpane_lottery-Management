@@ -3,6 +3,7 @@ import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { Save, LogOut, ShieldAlert, Settings, User, Key, Database, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PasswordInput, ValidatedInput } from '../../components/ui/ValidatedInput';
 
 export const AdminSettings: React.FC = () => {
   const { adminUser, updateSettings, resetSystem, adminLogout, contactSettings, fetchContactSettings, saveContactSettings } = useAdmin();
@@ -142,8 +143,9 @@ export const AdminSettings: React.FC = () => {
             <form onSubmit={handleProfileSubmit} className="space-y-4 text-xs">
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Display Name</label>
-                <input
+                <ValidatedInput
                   type="text"
+                  validation="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -151,8 +153,9 @@ export const AdminSettings: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Email Address</label>
-                <input
+                <ValidatedInput
                   type="email"
+                  validation="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -178,8 +181,7 @@ export const AdminSettings: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Current Password *</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -187,8 +189,7 @@ export const AdminSettings: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">New Password *</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -196,8 +197,7 @@ export const AdminSettings: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Confirm New Password *</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"

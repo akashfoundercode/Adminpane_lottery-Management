@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAgent } from '../context/AgentContext';
 import { useToast } from '../context/ToastContext';
 import { User, Phone, MessageSquare, MapPin, Shield, Calendar, Lock, Save, KeyRound } from 'lucide-react';
+import { PasswordInput, ValidatedInput } from '../components/ui/ValidatedInput';
 
 export const Profile: React.FC = () => {
   const { agent, updateProfile } = useAgent();
@@ -68,13 +69,13 @@ export const Profile: React.FC = () => {
       return;
     }
 
-    if (currentPassword !== '123456') {
+    if (currentPassword !== '12345678') {
       showToast('Incorrect current password.', 'error');
       return;
     }
 
     if (newPassword.length < 6) {
-      showToast('New password must be at least 6 characters long.', 'warning');
+      showToast('New password must be at least 8 characters long.', 'warning');
       return;
     }
 
@@ -143,22 +144,20 @@ export const Profile: React.FC = () => {
           <div className="flex border-b border-border-light bg-gray-50/50">
             <button
               onClick={() => setActiveTab('profile')}
-              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
-                activeTab === 'profile'
+              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${activeTab === 'profile'
                   ? 'border-brand-emerald text-brand-emerald bg-white'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               <User className="w-4 h-4" />
               <span>Contact Details</span>
             </button>
             <button
               onClick={() => setActiveTab('security')}
-              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
-                activeTab === 'security'
+              className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${activeTab === 'security'
                   ? 'border-brand-emerald text-brand-emerald bg-white'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
             >
               <Lock className="w-4 h-4" />
               <span>Security & Password</span>
@@ -180,8 +179,9 @@ export const Profile: React.FC = () => {
                     </label>
                     <div className="relative">
                       <User className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
+                      <ValidatedInput
                         type="text"
+                        validation="name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full pl-9 pr-4 py-2 bg-bg-app border border-border-light rounded-xl text-xs font-semibold text-text-primary focus:outline-none focus:border-brand-emerald transition-colors"
@@ -196,8 +196,9 @@ export const Profile: React.FC = () => {
                     </label>
                     <div className="relative">
                       <Phone className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
+                      <ValidatedInput
                         type="text"
+                        validation="phone"
                         value={mobile}
                         onChange={(e) => setMobile(e.target.value)}
                         className="w-full pl-9 pr-4 py-2 bg-bg-app border border-border-light rounded-xl text-xs font-semibold text-text-primary focus:outline-none focus:border-brand-emerald transition-colors"
@@ -212,8 +213,9 @@ export const Profile: React.FC = () => {
                     </label>
                     <div className="relative">
                       <MessageSquare className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
+                      <ValidatedInput
                         type="text"
+                        validation="phone"
                         value={whatsapp}
                         onChange={(e) => setWhatsapp(e.target.value)}
                         className="w-full pl-9 pr-4 py-2 bg-bg-app border border-border-light rounded-xl text-xs font-semibold text-text-primary focus:outline-none focus:border-brand-emerald transition-colors"
@@ -262,8 +264,7 @@ export const Profile: React.FC = () => {
                     </label>
                     <div className="relative">
                       <Lock className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="password"
+                      <PasswordInput
                         placeholder="e.g. 123456"
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
@@ -279,8 +280,7 @@ export const Profile: React.FC = () => {
                     </label>
                     <div className="relative">
                       <KeyRound className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="password"
+                      <PasswordInput
                         placeholder="At least 6 characters"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
@@ -296,8 +296,7 @@ export const Profile: React.FC = () => {
                     </label>
                     <div className="relative">
                       <KeyRound className="w-4 h-4 text-text-secondary absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="password"
+                      <PasswordInput
                         placeholder="Re-type new password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}

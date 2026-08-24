@@ -14,10 +14,10 @@ export const AdminAssignmentHistory: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Fetch on mount and when game filter changes
+  // Fetch one API page at a time.
   React.useEffect(() => {
-    fetchAssignmentHistory(10, 0, false, gameFilter === 'All' ? undefined : gameFilter);
-  }, [gameFilter]);
+    fetchAssignmentHistory(itemsPerPage, (currentPage - 1) * itemsPerPage, false, gameFilter === 'All' ? undefined : gameFilter);
+  }, [currentPage, gameFilter]);
 
   // Filter list (client-side for search/agent/status/game)
   const filteredHistory = useMemo(() => {
@@ -32,7 +32,7 @@ export const AdminAssignmentHistory: React.FC = () => {
   }, [assignmentHistory, searchTerm, gameFilter, agentFilter, statusFilter, games]);
 
   // Pagination
-  const paginatedHistory = filteredHistory;
+  const paginatedHistory = filteredHistory.slice(0, itemsPerPage);
 
   return (
     <div className="space-y-6 font-sans">
@@ -46,11 +46,10 @@ export const AdminAssignmentHistory: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => { setGameFilter('All'); setCurrentPage(1); }}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors border ${
-              gameFilter === 'All'
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-slate-50 text-text-secondary border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors border ${gameFilter === 'All'
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-slate-50 text-text-secondary border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+              }`}
           >
             All Games
           </button>
@@ -58,11 +57,10 @@ export const AdminAssignmentHistory: React.FC = () => {
             <button
               key={g.id}
               onClick={() => { setGameFilter(g.id); setCurrentPage(1); }}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors border ${
-                gameFilter === g.id
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-slate-50 text-text-secondary border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors border ${gameFilter === g.id
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-slate-50 text-text-secondary border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+                }`}
             >
               {g.name}
             </button>
@@ -125,7 +123,7 @@ export const AdminAssignmentHistory: React.FC = () => {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/50 border-b border-border-light text-[10px] text-text-secondary uppercase tracking-wider font-bold">
-                  <th className="py-3.5 px-4">Log ID</th>
+                  <th className="py-3.5 px-4">S. No.</th>
                   <th className="py-3.5 px-4 font-mono">Book ID</th>
                   <th className="py-3.5 px-4">Game Name</th>
                   <th className="py-3.5 px-4">Agent Name</th>
@@ -139,7 +137,7 @@ export const AdminAssignmentHistory: React.FC = () => {
               <tbody className="divide-y divide-border-light">
                 {paginatedHistory.map((log, index) => (
                   <tr key={`${log.id}-${index}`} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-text-secondary">{log.id}</td>
+                    <td className="py-3 px-4 font-semibold text-text-secondary">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                     <td className="py-3 px-4 font-mono font-bold text-indigo-600">{log.bookId}</td>
                     <td className="py-3 px-4 font-semibold text-text-primary">{log.gameName}</td>
                     <td className="py-3 px-4 font-medium text-text-primary">{log.agentName}</td>
@@ -183,10 +181,30 @@ export const AdminAssignmentHistory: React.FC = () => {
         )}
 
         {/* PAGINATION */}
-        {assignmentHistoryPagination.hasMore && (
-          <div className="px-4 py-3 border-t border-border-light bg-slate-50/50 flex items-center justify-between">
-            <span className="text-[11px] text-text-secondary">Showing {assignmentHistory.length} of {assignmentHistoryPagination.total || assignmentHistory.length} logs</span>
-            <button onClick={() => fetchAssignmentHistory(10, assignmentHistoryPagination.currentPage * 10, true, gameFilter === 'All' ? undefined : gameFilter)} className="px-4 py-2 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50">View More</button>
+        {(assignmentHistoryPagination.total > 0 || assignmentHistoryPagination.hasMore) && (
+          <div className="px-4 py-3 border-t border-border-light bg-slate-50/50 flex items-center justify-between gap-3">
+            <span className="text-[11px] text-text-secondary">
+              Showing {(currentPage - 1) * itemsPerPage + 1}-{(currentPage - 1) * itemsPerPage + paginatedHistory.length} of {assignmentHistoryPagination.total || assignmentHistory.length} logs
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage === 1 || loadingHistory}
+                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                className="px-3 py-2 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-[10px] font-bold text-indigo-700 whitespace-nowrap">Page {currentPage}</span>
+              <button
+                type="button"
+                disabled={!assignmentHistoryPagination.hasMore || loadingHistory}
+                onClick={() => setCurrentPage(page => page + 1)}
+                className="px-3 py-2 border border-border-light bg-white rounded-lg text-[10px] font-semibold text-text-primary hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

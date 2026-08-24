@@ -4,6 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { UserCheck, ShieldAlert, XCircle, Search, Calendar, CheckSquare, Square } from 'lucide-react';
 import { Book } from '../../types';
 import { apiUrl } from '../../config/api';
+import { ValidatedInput } from '../../components/ui/ValidatedInput';
 
 export const AdminBookAssignment: React.FC = () => {
   const { games, books, agents, assignBooks, revokeAssignment, fetchGameLockStatus } = useAdmin();
@@ -14,6 +15,7 @@ export const AdminBookAssignment: React.FC = () => {
   const [selectedBookIds, setSelectedBookIds] = useState<string[]>([]);
   const [expiryDate] = useState('');
   const [bookSearchTerm, setBookSearchTerm] = useState('');
+  const [bookCount, setBookCount] = useState<number | ''>('');
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(false);
   const [gameWindowExpired, setGameWindowExpired] = useState(false);
@@ -23,7 +25,7 @@ export const AdminBookAssignment: React.FC = () => {
 
   // Fetch available books from API when game changes
   useEffect(() => {
-    if (!selectedGameId) { setAvailableBooks([]); return; }
+    if (!selectedGameId) { setAvailableBooks([]); setBookCount(''); return; }
     const token = localStorage.getItem('admin_token') || '';
     setLoadingBooks(true);
     setGameWindowExpired(false);
@@ -84,6 +86,29 @@ export const AdminBookAssignment: React.FC = () => {
     return books.filter(b => b.status === 'Assigned' || b.status === 'In Progress');
   }, [books]);
 
+  const groupedActiveAssignments = useMemo(() => {
+    const groups = new Map<string, Book[]>();
+    activeAssignments.forEach(book => {
+      const agentName = book.agentName || 'Unassigned Agent';
+      const group = groups.get(agentName) || [];
+      group.push(book);
+      groups.set(agentName, group);
+    });
+
+    return Array.from(groups.entries())
+      .sort(([firstAgent], [secondAgent]) => firstAgent.localeCompare(secondAgent))
+      .map(([agentName, agentBooks]) => ({
+        agentName,
+        books: agentBooks.sort((firstBook, secondBook) =>
+          (firstBook.serialNumber || firstBook.id).localeCompare(
+            secondBook.serialNumber || secondBook.id,
+            undefined,
+            { numeric: true, sensitivity: 'base' }
+          )
+        )
+      }));
+  }, [activeAssignments]);
+
   // Toggle book selection
   const handleToggleBook = (bookId: string) => {
     setSelectedBookIds(prev =>
@@ -97,6 +122,18 @@ export const AdminBookAssignment: React.FC = () => {
     } else {
       setSelectedBookIds(availableBooks.map(b => String(b.apiId ?? b.id)));
     }
+  };
+
+  const handleSelectBookCount = () => {
+    if (bookCount === '' || bookCount < 1) {
+      showToast('Please enter a book count greater than 0.', 'error');
+      return;
+    }
+    if (bookCount > availableBooks.length) {
+      showToast(`Only ${availableBooks.length} available books can be selected.`, 'error');
+      return;
+    }
+    setSelectedBookIds(availableBooks.slice(0, bookCount).map(book => String(book.apiId ?? book.id)));
   };
 
   const handleAssign = async (e: React.FormEvent) => {
@@ -168,6 +205,44 @@ export const AdminBookAssignment: React.FC = () => {
               </select>
             </div>
 
+            {/* Select Agent */}
+            <div>
+              <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
+                Assign to Agent
+              </label>
+              <select
+                value={selectedAgentId}
+                onChange={(e) => setSelectedAgentId(e.target.value)}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white text-text-primary font-semibold cursor-pointer"
+              >
+                <option value="">Choose Agent</option>
+                {agents.filter(a => a.status === 'Active').map(a => (
+                  <option key={a.id} value={a.id}>{a.name} ({a.agentType})</option>
+                ))}
+              </select>
+            </div>
+
+            {selectedAgent && (
+              <div>
+                <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">
+                  Agent Type
+                </label>
+                <div className="bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-text-secondary select-none">
+                  {selectedAgent.agentType}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={selectedBookIds.length === 0 || !selectedAgentId}
+              className="w-full inline-flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Assign {selectedBookIds.length} Books</span>
+            </button>
+
             {/* Select Available Books */}
             {selectedGameId && (
               <div>
@@ -200,7 +275,32 @@ export const AdminBookAssignment: React.FC = () => {
                   </div>
                 )}
 
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-[160px] overflow-y-auto space-y-1.5">
+                {availableBooks.length > 0 && (
+                  <div className="flex items-end gap-2 mb-3">
+                    <label className="flex-1 text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                      Book Count
+                      <ValidatedInput
+                        type="number"
+                        min="1"
+                        max={availableBooks.length}
+                        value={bookCount}
+                        onChange={(e) => setBookCount(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="e.g. 10"
+                        validation="positiveNumber"
+                        className="mt-1 w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-text-primary"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSelectBookCount}
+                      className="shrink-0 rounded-xl bg-indigo-50 border border-indigo-200 px-3 py-2 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                    >
+                      Select Books
+                    </button>
+                  </div>
+                )}
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 max-h-[480px] overflow-y-auto space-y-1.5">
                   {loadingBooks ? (
                     <div className="text-center py-6 text-text-secondary text-[11px] italic">Loading books...</div>
                   ) : gameWindowExpired ? (
@@ -244,44 +344,6 @@ export const AdminBookAssignment: React.FC = () => {
               </div>
             )}
 
-            {/* Select Agent */}
-            <div>
-              <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
-                Assign to Agent
-              </label>
-              <select
-                value={selectedAgentId}
-                onChange={(e) => setSelectedAgentId(e.target.value)}
-                required
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white text-text-primary font-semibold cursor-pointer"
-              >
-                <option value="">Choose Agent</option>
-                {agents.filter(a => a.status === 'Active').map(a => (
-                  <option key={a.id} value={a.id}>{a.name} ({a.agentType})</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Display Agent Type */}
-            {selectedAgent && (
-              <div>
-                <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">
-                  Agent Type
-                </label>
-                <div className="bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-text-secondary select-none">
-                  {selectedAgent.agentType}
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={selectedBookIds.length === 0 || !selectedAgentId}
-              className="w-full inline-flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Assign {selectedBookIds.length} Books</span>
-            </button>
           </form>
         </div>
 
@@ -308,26 +370,35 @@ export const AdminBookAssignment: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-light">
-                  {activeAssignments.map(b => (
-                    <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-2.5 px-3 font-semibold text-text-primary">{b.id}</td>
-                      <td className="py-2.5 px-3 font-semibold text-text-primary max-w-[130px] truncate">{b.gameName}</td>
-                      <td className="py-2.5 px-3 font-medium text-text-primary">{b.agentName}</td>
-                      <td className="py-2.5 px-3">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${b.id.includes('BK110') ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
-                          }`}>
-                          {b.id.includes('BK110') ? 'Third Party' : 'First Party'}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <button
-                          onClick={() => handleRevoke(b.id)}
-                          className="text-[10px] font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded transition-colors"
-                        >
-                          Revoke
-                        </button>
-                      </td>
-                    </tr>
+                  {groupedActiveAssignments.map(({ agentName, books: agentBooks }) => (
+                    <React.Fragment key={agentName}>
+                      <tr className="bg-indigo-50/60 border-y border-indigo-100">
+                        <td colSpan={5} className="py-2 px-3 text-[11px] font-bold text-indigo-800 uppercase tracking-wider">
+                          {agentName} <span className="font-medium text-indigo-500">({agentBooks.length} books)</span>
+                        </td>
+                      </tr>
+                      {agentBooks.map(b => (
+                        <tr key={b.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-text-primary">{b.id}</td>
+                          <td className="py-2.5 px-3 font-semibold text-text-primary max-w-[130px] truncate">{b.gameName}</td>
+                          <td className="py-2.5 px-3 font-medium text-text-primary">{b.agentName}</td>
+                          <td className="py-2.5 px-3">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${b.id.includes('BK110') ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                              }`}>
+                              {b.id.includes('BK110') ? 'Third Party' : 'First Party'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <button
+                              onClick={() => handleRevoke(b.id)}
+                              className="text-[10px] font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded transition-colors"
+                            >
+                              Revoke
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

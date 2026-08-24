@@ -128,6 +128,7 @@ export interface Result {
 export interface AssignmentHistory {
   id: string;
   bookId: string;
+  serialNumber?: string;
   bookName?: string;
   gameName: string;
   agentName: string;
@@ -135,6 +136,8 @@ export interface AssignmentHistory {
   agentType: 'First Party' | 'Third Party';
   assignedDate: string;
   expiryDate: string;
+  soldDate?: string;
+  unsoldDate?: string;
   status: string;
 }
 

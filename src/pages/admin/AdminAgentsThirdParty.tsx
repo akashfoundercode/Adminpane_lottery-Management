@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext';
 import { Search, Plus, Edit, Trash2, UserCheck, UserX, Eye, AlertCircle } from 'lucide-react';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
+import { PasswordInput, ValidatedInput } from '../../components/ui/ValidatedInput';
 
 export const AdminAgentsThirdParty: React.FC = () => {
   const { agents, agentsPagination, createAgent, updateAgent, deleteAgent, toggleAgentStatus, fetchAgents, loadingAgents } = useAdmin();
@@ -202,6 +203,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-border-light text-[10px] text-text-secondary uppercase tracking-wider font-bold">
+                  <th className="py-3.5 px-4">S. No.</th>
                   <th className="py-3.5 px-4">Agent ID</th>
                   <th className="py-3.5 px-4">Name</th>
                   <th className="py-3.5 px-4">Email</th>
@@ -212,8 +214,9 @@ export const AdminAgentsThirdParty: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-light">
-                {paginatedAgents.map((agent) => (
+                {paginatedAgents.map((agent, index) => (
                   <tr key={agent.id} className="hover:bg-slate-50/30 transition-colors">
+                    <td className="py-3 px-4 font-semibold text-text-secondary">{index + 1}</td>
                     <td className="py-3 px-4 font-mono font-bold text-indigo-600">{agent.id}</td>
                     <td className="py-3 px-4 font-semibold text-text-primary">{agent.name}</td>
                     <td className="py-3 px-4 text-text-secondary font-medium">{agent.email}</td>
@@ -281,9 +284,10 @@ export const AdminAgentsThirdParty: React.FC = () => {
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Agent Name *</label>
-                <input
+                <ValidatedInput
                   type="text"
                   required
+                  validation="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -291,9 +295,10 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Email *</label>
-                <input
+                <ValidatedInput
                   type="email"
                   required
+                  validation="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -301,9 +306,10 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Mobile Number *</label>
-                <input
+                <ValidatedInput
                   type="text"
                   required
+                  validation="phone"
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
                   inputMode="numeric"
@@ -314,9 +320,10 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">WhatsApp Number *</label>
-                <input
+                <ValidatedInput
                   type="text"
                   required
+                  validation="phone"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -324,7 +331,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Address *</label>
-                <input
+                <ValidatedInput
                   type="text"
                   required
                   value={address}
@@ -334,8 +341,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Password *</label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -383,9 +389,10 @@ export const AdminAgentsThirdParty: React.FC = () => {
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Agent Name *</label>
-                <input
+                <ValidatedInput
                   type="text"
                   required
+                  validation="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -393,9 +400,10 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Email *</label>
-                <input
+                <ValidatedInput
                   type="email"
                   required
+                  validation="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -403,9 +411,10 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Mobile *</label>
-                <input
+                <ValidatedInput
                   type="text"
                   required
+                  validation="phone"
                   value={mobile}
                   onChange={(e) => setMobile(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -413,12 +422,13 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">WhatsApp Number *</label>
-                <input type="text" required value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="numeric" maxLength={10} pattern="[0-9]{10}" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+                <ValidatedInput type="text" required validation="phone" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="numeric" maxLength={10} pattern="[0-9]{10}" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Address</label>
-                <input
+                <ValidatedInput
                   type="text"
+                  validation="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary"
@@ -426,7 +436,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Password (optional)</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave blank to keep current password" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
+                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Leave blank to keep current password" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white text-text-primary" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-text-secondary uppercase mb-1">Status *</label>

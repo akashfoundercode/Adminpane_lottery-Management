@@ -223,7 +223,7 @@ const generateMockBooks = (): Book[] => {
 
 export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('agent_auth') === 'true';
+    return localStorage.getItem('agent_auth') === 'true' && Boolean(localStorage.getItem('agent_token'));
   });
 
   const [agent, setAgent] = useState<Agent | null>(() => {
@@ -291,16 +291,55 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [books]);
 
   const login = async (agentId: string, password: string): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 800));
+    const normalizedAgentId = agentId.trim();
+    const response = await fetch(apiUrl('/api/v1/agent/login'), {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ agent_id: normalizedAgentId, password })
+    });
 
-    if (agentId === 'AG1001' && password === '123456') {
-      setIsAuthenticated(true);
-      setAgent(DUMMY_AGENT);
-      localStorage.setItem('agent_auth', 'true');
-      localStorage.setItem('agent_profile', JSON.stringify(DUMMY_AGENT));
-      return true;
+    const responseText = await response.text();
+    let data: any = null;
+    try { data = responseText ? JSON.parse(responseText) : null; } catch { /* Non-JSON error response. */ }
+
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || (response.status === 401
+        ? 'Invalid agent ID or password.'
+        : `Login failed (${response.status}). Please try again.`));
     }
-    return false;
+
+    const receivedToken = data?.token
+      || data?.access_token
+      || data?.data?.token
+      || data?.data?.access_token;
+    if (!receivedToken) {
+      throw new Error('Agent login response did not include an access token.');
+    }
+
+    const rawAgent = data?.agent || data?.data?.agent || data?.data?.user || data?.data || {};
+    const profile: Agent = {
+      ...DUMMY_AGENT,
+      id: String(rawAgent.id || rawAgent.agent_id || normalizedAgentId),
+      apiId: Number(rawAgent.id || DUMMY_AGENT.apiId),
+      agentId: String(rawAgent.agent_id || rawAgent.code || normalizedAgentId),
+      name: rawAgent.agent_name || rawAgent.name || normalizedAgentId,
+      email: rawAgent.email || '',
+      mobile: rawAgent.mobile_number || rawAgent.mobile || '',
+      whatsapp: rawAgent.whatsapp_number || rawAgent.whatsapp || '',
+      address: rawAgent.address || '',
+      agentType: rawAgent.agent_type === 'third_party' ? 'Third Party' : 'First Party',
+      status: rawAgent.status === 'inactive' ? 'Inactive' : 'Active'
+    };
+
+    setIsAuthenticated(true);
+    setAgent(profile);
+    localStorage.setItem('agent_auth', 'true');
+    localStorage.setItem('agent_profile', JSON.stringify(profile));
+    localStorage.setItem('agent_token', receivedToken);
+    return true;
   };
 
   const logout = () => {
@@ -308,6 +347,7 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAgent(null);
     localStorage.removeItem('agent_auth');
     localStorage.removeItem('agent_profile');
+    localStorage.removeItem('agent_token');
   };
 
   const fetchAgentBooks = async (limit = 10, offset = 0, append = false) => {
@@ -319,6 +359,13 @@ export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
       });
+      if (response.status === 401) {
+        localStorage.removeItem('agent_token');
+        localStorage.removeItem('agent_auth');
+        setIsAuthenticated(false);
+        setAgent(null);
+        return;
+      }
       if (!response.ok) return;
 
       const json = await response.json();

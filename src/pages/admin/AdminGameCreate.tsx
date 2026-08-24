@@ -4,6 +4,7 @@ import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { ArrowLeft, Save, Upload, Trophy, Ticket, Image as ImageIcon, Info, Trash2 } from 'lucide-react';
 import { GamePrize } from '../../types';
+import { ValidatedInput } from '../../components/ui/ValidatedInput';
 
 export const AdminGameCreate: React.FC = () => {
   const { createGame, updateGame, games } = useAdmin();
@@ -15,7 +16,7 @@ export const AdminGameCreate: React.FC = () => {
 
   const [name, setName] = useState('');
   const [gameCode, setGameCode] = useState('');
-  const [ticketPrice, setTicketPrice] = useState(100);
+  const [ticketPrice, setTicketPrice] = useState<number | ''>('');
   const [bookSize, setBookSize] = useState(10);
   const [drawDate, setDrawDate] = useState('');
   const [drawTime, setDrawTime] = useState('18:00');
@@ -49,7 +50,7 @@ export const AdminGameCreate: React.FC = () => {
     if (editGame) {
       setName(editGame.name || '');
       setGameCode(editGame.gameCode || '');
-      setTicketPrice(editGame.ticketPrice || 100);
+      setTicketPrice(editGame.ticketPrice || '');
       setBookSize(editGame.bookSize || 10);
       setDrawDate(editGame.drawDate || '');
       setDrawTime(editGame.drawTime?.slice(0, 5) || '18:00');
@@ -114,12 +115,17 @@ export const AdminGameCreate: React.FC = () => {
         return;
       }
     }
-    if (ticketPrice < 1) {
+    if (ticketPrice === '' || ticketPrice < 1) {
       showToast('Ticket Prize must be at least 1.', 'error');
       return;
     }
     if (!editId && !imageFile) {
       showToast('Game Image: Please upload a JPG, JPEG, PNG, or WEBP image.', 'error');
+      return;
+    }
+
+    if (prizes.length === 0) {
+      showToast('Please add at least one prize before saving the game.', 'error');
       return;
     }
 
@@ -129,6 +135,11 @@ export const AdminGameCreate: React.FC = () => {
       rank: Number(prize.rank) || index + 1,
       prizeName: prize.prizeName.trim()
     }));
+
+    if (normalizedPrizes.length === 0) {
+      showToast('Please enter a name for at least one prize before saving the game.', 'error');
+      return;
+    }
 
     const prizeWithoutImage = normalizedPrizes.findIndex(prize => !prize.imageFile && !prize.image);
     if (prizeWithoutImage !== -1) {
@@ -183,6 +194,28 @@ export const AdminGameCreate: React.FC = () => {
     }
   };
 
+  const renderPrize = (prize: GamePrize, index: number) => (
+    <div key={prize.id || index} className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end bg-slate-50/80 border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm">
+      <label className="text-[10px] font-semibold text-text-secondary uppercase sm:col-span-1">
+        Rank
+        <input type="number" min="1" value={prize.rank} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, rank: Number(e.target.value) } : item))} className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary" />
+      </label>
+      <label className="text-[10px] font-semibold text-text-secondary uppercase sm:col-span-1">
+        Prize Name
+        <ValidatedInput type="text" validation="requiredText" value={prize.prizeName} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, prizeName: e.target.value } : item))} placeholder="First Prize" className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary" />
+      </label>
+      <div className="text-[10px] font-semibold text-text-secondary uppercase sm:col-span-2">
+        Prize Image
+        <label className="mt-1 flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-2 cursor-pointer text-[10px] text-text-secondary">
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handlePrizeImageChange(index, e)} className="sr-only" />
+          <ImageIcon className="w-3.5 h-3.5 text-violet-500" /> {prize.imageFile ? prize.imageFile.name : prize.image ? 'Current image' : 'Choose image'}
+        </label>
+        {prize.image && <img src={prize.image} alt="Prize preview" className="mt-2 h-12 w-12 object-cover rounded-lg border border-slate-200" />}
+      </div>
+      <button type="button" aria-label="Remove prize" onClick={() => setPrizes(prev => prev.filter((_, itemIndex) => itemIndex !== index))} className="justify-self-end p-2 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+    </div>
+  );
+
   return (
     <div className="space-y-6 font-sans max-w-7xl mx-auto pb-6">
       <div className="flex items-center gap-3 px-1">
@@ -199,10 +232,9 @@ export const AdminGameCreate: React.FC = () => {
       </div>
 
       <div className="bg-transparent">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 md:max-h-[calc(100vh-150px)] md:overflow-y-auto md:pr-2">
           <div
-            className="relative md:min-h-[var(--prize-panel-height)] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)] gap-4 lg:gap-5 items-start bg-white border border-border-light rounded-2xl shadow-sm p-4 sm:p-5"
-            style={{ '--prize-panel-height': `${Math.max(760, 190 + prizes.length * 122)}px` } as React.CSSProperties}
+            className="relative md:min-h-[980px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)] gap-4 lg:gap-5 items-start bg-white border border-border-light rounded-2xl shadow-sm p-4 sm:p-5"
           >
             {/* Game Name */}
             <div className="md:col-span-1 md:col-start-1 lg:col-span-1 lg:col-start-1">
@@ -213,9 +245,10 @@ export const AdminGameCreate: React.FC = () => {
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Game Name <span className="text-rose-500">*</span>
               </label>
-              <input
+              <ValidatedInput
                 type="text"
                 required
+                validation="requiredText"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Diwali Super Draw"
@@ -228,12 +261,13 @@ export const AdminGameCreate: React.FC = () => {
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Ticket Prize <span className="text-rose-500">*</span>
               </label>
-              <input
+              <ValidatedInput
                 type="number"
                 min="1"
                 required
+                validation="positiveNumber"
                 value={ticketPrice}
-                onChange={(e) => setTicketPrice(Number(e.target.value))}
+                onChange={(e) => setTicketPrice(e.target.value === '' ? '' : Number(e.target.value))}
                 placeholder="e.g. 100"
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary"
               />
@@ -274,10 +308,12 @@ export const AdminGameCreate: React.FC = () => {
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Draw Date <span className="text-rose-500">*</span>
               </label>
-              <input
+              <ValidatedInput
                 type="date"
                 required
                 min={today}
+                validation="dateAfter"
+                compareTo={endDate}
                 value={drawDate}
                 onChange={(e) => setDrawDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-text-primary"
@@ -299,7 +335,7 @@ export const AdminGameCreate: React.FC = () => {
             </div>
 
             {/* Game Prizes */}
-            <div className="md:absolute md:top-4 md:left-1/2 md:right-4 lg:left-[40%] bg-white border border-border-light rounded-2xl shadow-sm p-4 sm:p-5 min-w-0">
+            <div className="md:absolute md:top-4 md:bottom-4 md:left-1/2 md:right-4 lg:left-[40%] bg-white border border-border-light rounded-2xl shadow-sm p-4 sm:p-5 min-w-0">
               <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-5">
                 <div className="flex items-center gap-3">
                   <span className="h-9 w-9 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center"><Trophy className="w-4 h-4" /></span>
@@ -313,35 +349,29 @@ export const AdminGameCreate: React.FC = () => {
               {prizes.length === 0 ? (
                 <p className="text-xs text-text-secondary bg-slate-50 border border-slate-200 rounded-xl px-3 py-3">No prizes added yet.</p>
               ) : (
-                <div className="space-y-3 md:max-h-[540px] md:overflow-y-auto md:pr-2">
-                  {prizes.map((prize, index) => (
-                    <div key={prize.id || index} className="grid grid-cols-1 sm:grid-cols-[72px_1fr_1fr_1fr_auto] gap-3 items-end bg-slate-50 border border-slate-200 rounded-xl p-3">
-                      <label className="text-[10px] font-semibold text-text-secondary uppercase">
-                        Rank
-                        <input type="number" min="1" value={prize.rank} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, rank: Number(e.target.value) } : item))} className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary" />
-                      </label>
-                      <label className="text-[10px] font-semibold text-text-secondary uppercase">
-                        Prize Name
-                        <input type="text" value={prize.prizeName} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, prizeName: e.target.value } : item))} placeholder="First Prize" className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary" />
-                      </label>
-                      <label className="text-[10px] font-semibold text-text-secondary uppercase">
-                        Prize Type
-                        <select value={prize.prizeType} onChange={e => setPrizes(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, prizeType: e.target.value as GamePrize['prizeType'] } : item))} className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs text-text-primary">
-                          <option value="book_winner">Book Winner</option>
-                          <option value="ticket_winner">Ticket Winner</option>
-                        </select>
-                      </label>
-                      <div className="text-[10px] font-semibold text-text-secondary uppercase">
-                        Prize Image
-                        <label className="mt-1 flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-2 cursor-pointer text-[10px] text-text-secondary">
-                          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => handlePrizeImageChange(index, e)} className="sr-only" />
-                          <ImageIcon className="w-3.5 h-3.5 text-violet-500" /> {prize.imageFile ? prize.imageFile.name : prize.image ? 'Current image' : 'Choose image'}
-                        </label>
-                        {prize.image && <img src={prize.image} alt="Prize preview" className="mt-2 h-12 w-12 object-cover rounded-lg border border-slate-200" />}
-                      </div>
-                      <button type="button" aria-label="Remove prize" onClick={() => setPrizes(prev => prev.filter((_, itemIndex) => itemIndex !== index))} className="p-2 text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[820px] overflow-y-auto pr-2 items-start">
+                  {(['book_winner', 'ticket_winner'] as const).map((prizeType) => {
+                    const groupedPrizes = prizes
+                      .map((prize, index) => ({ prize, index }))
+                      .filter(({ prize }) => prize.prizeType === prizeType);
+                    return (
+                      <section key={prizeType} className={`space-y-3 rounded-2xl p-3 sm:p-4 border shadow-sm ${prizeType === 'book_winner' ? 'border-violet-100 bg-violet-50/30' : 'border-sky-100 bg-sky-50/30'}`}>
+                        <div className="flex items-center justify-between gap-2 border-b border-white/80 pb-3">
+                          <h4 className="text-xs font-bold text-text-primary uppercase tracking-wider">
+                            {prizeType === 'book_winner' ? 'Book Winner Prizes' : 'Ticket Winner Prizes'}
+                          </h4>
+                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-bold ${prizeType === 'book_winner' ? 'bg-violet-100 text-violet-700' : 'bg-sky-100 text-sky-700'}`}>
+                            {groupedPrizes.length} {groupedPrizes.length === 1 ? 'Prize' : 'Prizes'}
+                          </span>
+                        </div>
+                        {groupedPrizes.length === 0 ? (
+                          <p className="text-[11px] text-text-secondary">No {prizeType === 'book_winner' ? 'book' : 'ticket'} prizes added.</p>
+                        ) : (
+                          groupedPrizes.map(({ prize, index }) => renderPrize(prize, index))
+                        )}
+                      </section>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -393,8 +423,9 @@ export const AdminGameCreate: React.FC = () => {
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 YouTube Live Stream URL
               </label>
-              <input
+              <ValidatedInput
                 type="url"
+                validation="url"
                 value={youtubeLiveUrl}
                 onChange={(e) => setYoutubeLiveUrl(e.target.value)}
                 placeholder="https://youtube.com/live/demo"
@@ -407,8 +438,9 @@ export const AdminGameCreate: React.FC = () => {
               <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider mb-1.5">
                 Facebook Live Stream URL
               </label>
-              <input
+              <ValidatedInput
                 type="url"
+                validation="url"
                 value={facebookLiveUrl}
                 onChange={(e) => setFacebookLiveUrl(e.target.value)}
                 placeholder="https://facebook.com/live/demo"

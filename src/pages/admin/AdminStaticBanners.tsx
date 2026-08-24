@@ -4,6 +4,7 @@ import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
 import { PageLoader } from '../../components/PageLoader';
 import { StaticBanner } from '../../types';
+import { FieldError } from '../../components/ui/FieldError';
 
 export const AdminStaticBanners: React.FC = () => {
     const { fetchStaticBanners, createStaticBanner, updateStaticBanner, deleteStaticBanner } = useAdmin();
@@ -16,6 +17,7 @@ export const AdminStaticBanners: React.FC = () => {
     const [link, setLink] = useState('');
     const [editing, setEditing] = useState<StaticBanner | null>(null);
     const [editFile, setEditFile] = useState<File | null>(null);
+    const [formError, setFormError] = useState('');
 
     const load = async () => {
         setLoading(true);
@@ -36,14 +38,16 @@ export const AdminStaticBanners: React.FC = () => {
         setLink('');
         setEditing(null);
         setEditFile(null);
+        setFormError('');
     };
 
     const handleCreate = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!file) {
-            showToast('Please select a banner image.', 'error');
+            setFormError('Please select a banner image.');
             return;
         }
+        setFormError('');
         setSaving(true);
         try {
             const created = await createStaticBanner(file, title.trim(), link.trim());
@@ -51,7 +55,7 @@ export const AdminStaticBanners: React.FC = () => {
             resetForm();
             showToast('Static banner uploaded successfully.', 'success');
         } catch (error) {
-            showToast(error instanceof Error ? error.message : 'Failed to upload static banner.', 'error');
+            setFormError(error instanceof Error ? error.message : 'Failed to upload static banner.');
         } finally {
             setSaving(false);
         }
@@ -101,6 +105,7 @@ export const AdminStaticBanners: React.FC = () => {
                     <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Banner title (optional)" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-text-primary" />
                     <input type="url" value={link} onChange={event => setLink(event.target.value)} placeholder="Click URL (optional)" className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-text-primary" />
                 </div>
+                <FieldError message={formError} />
                 <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-xs font-semibold"><ImagePlus className="w-3.5 h-3.5" />{saving ? 'Uploading...' : 'Upload Banner'}</button>
             </form>
 
@@ -116,7 +121,7 @@ export const AdminStaticBanners: React.FC = () => {
                 </div>}
             </div>
 
-            {editing && <div className="fixed inset-0 z-50 bg-slate-950/50 flex items-center justify-center p-4"><form onSubmit={handleUpdate} className="relative w-full max-w-md bg-white rounded-xl p-5 space-y-4 shadow-2xl"><button type="button" onClick={resetForm} aria-label="Close edit banner" className="absolute top-3 right-3 p-1.5 text-text-secondary"><X className="w-4 h-4" /></button><h3 className="text-sm font-bold text-text-primary">Edit Static Banner</h3><input value={editing.title || ''} onChange={event => setEditing({ ...editing, title: event.target.value })} placeholder="Banner title" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" /><input type="url" value={editing.link || ''} onChange={event => setEditing({ ...editing, link: event.target.value })} placeholder="Click URL" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" /><select value={editing.status || 'active'} onChange={event => setEditing({ ...editing, status: event.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs"><option value="active">Active</option><option value="inactive">Inactive</option></select><label className="block border border-dashed border-slate-200 rounded-lg p-3 text-xs text-text-secondary cursor-pointer"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setEditFile(event.target.files?.[0] || null)} className="sr-only" />{editFile ? editFile.name : 'Replace image (optional)'}</label><button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"><Save className="w-3.5 h-3.5" />{saving ? 'Saving...' : 'Save Changes'}</button></form></div>}
+            {editing && <div className="fixed inset-0 z-50 bg-slate-950/50 flex items-center justify-center p-4"><form onSubmit={handleUpdate} className="relative w-full max-w-md bg-white rounded-xl p-5 space-y-4 shadow-2xl"><button type="button" onClick={resetForm} aria-label="Close edit banner" className="absolute top-3 right-3 p-1.5 text-text-secondary"><X className="w-4 h-4" /></button><h3 className="text-sm font-bold text-text-primary">Edit Static Banner</h3><input value={editing.title || ''} onChange={event => setEditing({ ...editing, title: event.target.value })} placeholder="Banner title" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" /><input type="url" value={editing.link || ''} onChange={event => setEditing({ ...editing, link: event.target.value })} placeholder="Click URL" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs" /><select value={editing.status || 'active'} onChange={event => setEditing({ ...editing, status: event.target.value })} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs"><option value="active">Active</option><option value="inactive">Inactive</option></select><label className="block border border-dashed border-slate-200 rounded-lg p-3 text-xs text-text-secondary cursor-pointer"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setEditFile(event.target.files?.[0] || null)} className="sr-only" />{editFile ? editFile.name : 'Replace image (optional)'}</label><FieldError message={formError} /><button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold disabled:opacity-50"><Save className="w-3.5 h-3.5" />{saving ? 'Saving...' : 'Save Changes'}</button></form></div>}
         </div>
     );
 };
