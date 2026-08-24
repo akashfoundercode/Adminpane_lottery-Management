@@ -13,10 +13,10 @@
   --color-warning-main: #F59E0B;
   --color-danger-main: #DC2626;
   --color-info-main: #2563EB;
-  
+
   --font-display: "Outfit", "Inter", system-ui, -apple-system, sans-serif;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  
+
   --radius-2xl: 24px;
 }
 
@@ -32,6 +32,17 @@ body {
   background-color: #F7F9FC;
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+button:not(:disabled),
+a,
+select,
+label[for] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 /* Premium panel styling */
@@ -82,6 +93,7 @@ body {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
