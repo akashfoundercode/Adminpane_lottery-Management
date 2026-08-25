@@ -1709,8 +1709,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const createAgent = async (agentData: Omit<Agent, 'id' | 'agentId'> & { password: string }) => {
     const token = localStorage.getItem('admin_token') || '3|bpXivPtgjfWxYkYX107oloDEn2EhL2RsZeYWYctTde478c0d';
 
-    // Auto-generate agent ID if not present
-    const generatedAgentId = `AG1${String(agents.length + 1).padStart(3, '0')}`;
+    // Auto-generate unique agent ID by finding max numeric ID
+    // Calculate max numeric ID among existing agents to prevent duplicate agent_id error
+    const existingNums = agents.map(a => {
+      const nums = (a.agentId || a.id || '').replace(/\D/g, '');
+      return nums ? parseInt(nums, 10) : 0;
+    }).filter(n => !isNaN(n) && n < 999999);
+
+    const maxNum = existingNums.length > 0 ? Math.max(...existingNums, 1000) : 1000;
+    const generatedAgentId = `AG${maxNum + 1}`;
     const apiType = agentData.agentType === 'First Party' ? 'first_party' : 'third_party';
 
     const payload = {

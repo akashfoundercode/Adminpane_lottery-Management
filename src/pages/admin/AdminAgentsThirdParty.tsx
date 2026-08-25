@@ -12,7 +12,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
   const { showToast } = useToast();
 
   React.useEffect(() => {
-    fetchAgents(10, 0, false);
+    fetchAgents(1000, 0, false);
   }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,6 +86,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
         password,
         status
       });
+      await fetchAgents(1000, 0, false);
       showToast('Third Party Agent added successfully.', 'success');
       setIsAddOpen(false);
       // Reset form
@@ -96,9 +97,13 @@ export const AdminAgentsThirdParty: React.FC = () => {
       setAddress('');
       setPassword('');
       setStatus('Active');
+      setTimeout(() => {
+        window.location.reload();
+      }, 400);
     } catch (err: any) {
       showToast(err.message || 'Failed to create agent.', 'error');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -117,6 +122,8 @@ export const AdminAgentsThirdParty: React.FC = () => {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
+
     if (!name.trim() || !email.trim() || !mobile.trim() || !whatsapp.trim() || !address.trim()) {
       showToast('Please complete all agent fields.', 'error');
       return;
@@ -130,6 +137,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
       return;
     }
     if (selectedAgent) {
+      isSubmittingRef.current = true;
       setIsSubmitting(true);
       try {
         await updateAgent(selectedAgent.id, {
@@ -141,12 +149,17 @@ export const AdminAgentsThirdParty: React.FC = () => {
           ...(password ? { password } : {}),
           status
         });
+        await fetchAgents(1000, 0, false);
         showToast('Agent details updated.', 'success');
         setIsEditOpen(false);
         setSelectedAgent(null);
+        setTimeout(() => {
+          window.location.reload();
+        }, 400);
       } catch (err: any) {
         showToast(err.message || 'Failed to update agent.', 'error');
       } finally {
+        isSubmittingRef.current = false;
         setIsSubmitting(false);
       }
     }

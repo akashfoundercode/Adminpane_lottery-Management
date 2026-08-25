@@ -12,7 +12,7 @@ export const AdminAgentsFirstParty: React.FC = () => {
   const { showToast } = useToast();
 
   React.useEffect(() => {
-    fetchAgents(10, 0, false);
+    fetchAgents(1000, 0, false);
   }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,6 +86,7 @@ export const AdminAgentsFirstParty: React.FC = () => {
         password,
         status
       });
+      await fetchAgents(1000, 0, false);
       showToast('Agent added successfully.', 'success');
       setIsAddOpen(false);
       // Reset form
@@ -96,6 +97,9 @@ export const AdminAgentsFirstParty: React.FC = () => {
       setAddress('');
       setPassword('');
       setStatus('Active');
+      setTimeout(() => {
+        window.location.reload();
+      }, 400);
     } catch (err: any) {
       showToast(err.message || 'Failed to create agent.', 'error');
     } finally {
@@ -141,9 +145,13 @@ export const AdminAgentsFirstParty: React.FC = () => {
           ...(password ? { password } : {}),
           status
         });
+        await fetchAgents(1000, 0, false);
         showToast('Agent details updated.', 'success');
         setIsEditOpen(false);
         setSelectedAgent(null);
+        setTimeout(() => {
+          window.location.reload();
+        }, 400);
       } catch (err: any) {
         showToast(err.message || 'Failed to update agent.', 'error');
       } finally {
