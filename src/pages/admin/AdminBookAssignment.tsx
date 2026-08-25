@@ -182,6 +182,7 @@ export const AdminBookAssignment: React.FC = () => {
       await assignBooks(selectedGameId, selectedBookIds, selectedAgentId);
       showToast(`Successfully assigned ${selectedBookIds.length} books to ${selectedAgent?.name}.`, 'success');
       setSelectedBookIds([]);
+      setActiveAssignmentsPage(1);
     } catch (err: any) {
       showToast(err.message || 'Assignment failed.', 'error');
     }

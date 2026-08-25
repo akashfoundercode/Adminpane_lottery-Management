@@ -1571,7 +1571,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // Reload lists to sync live state
-      await fetchBooks();
+      await fetchBooks(200, 1, true);
       await fetchGames();
       await fetchAssignmentHistory(10, 0, false);
     } catch (err: any) {
