@@ -19,6 +19,8 @@ export const AdminBookAssignment: React.FC = () => {
   const [availableBooks, setAvailableBooks] = useState<Book[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(false);
   const [gameWindowExpired, setGameWindowExpired] = useState(false);
+  const [activeAssignmentsPage, setActiveAssignmentsPage] = useState(1);
+  const activeAssignmentsPerPage = 20;
 
   // Derived agent
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
@@ -108,6 +110,26 @@ export const AdminBookAssignment: React.FC = () => {
         )
       }));
   }, [activeAssignments]);
+
+  const paginatedActiveAssignments = useMemo(() => {
+    const orderedAssignments = groupedActiveAssignments.flatMap(group => group.books);
+    const start = (activeAssignmentsPage - 1) * activeAssignmentsPerPage;
+    return orderedAssignments.slice(start, start + activeAssignmentsPerPage);
+  }, [groupedActiveAssignments, activeAssignmentsPage]);
+
+  const paginatedAssignmentGroups = useMemo(() => {
+    const groups = new Map<string, Book[]>();
+    paginatedActiveAssignments.forEach(book => {
+      const agentName = book.agentName || 'Unassigned Agent';
+      groups.set(agentName, [...(groups.get(agentName) || []), book]);
+    });
+    return Array.from(groups.entries()).map(([agentName, agentBooks]) => ({ agentName, books: agentBooks }));
+  }, [paginatedActiveAssignments]);
+
+  useEffect(() => {
+    const lastPage = Math.max(1, Math.ceil(activeAssignments.length / activeAssignmentsPerPage));
+    setActiveAssignmentsPage(page => Math.min(page, lastPage));
+  }, [activeAssignments.length]);
 
   // Toggle book selection
   const handleToggleBook = (bookId: string) => {
@@ -370,7 +392,7 @@ export const AdminBookAssignment: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-light">
-                  {groupedActiveAssignments.map(({ agentName, books: agentBooks }) => (
+                  {paginatedAssignmentGroups.map(({ agentName, books: agentBooks }) => (
                     <React.Fragment key={agentName}>
                       <tr className="bg-indigo-50/60 border-y border-indigo-100">
                         <td colSpan={5} className="py-2 px-3 text-[11px] font-bold text-indigo-800 uppercase tracking-wider">
@@ -404,6 +426,32 @@ export const AdminBookAssignment: React.FC = () => {
               </table>
             )}
           </div>
+          {activeAssignments.length > 0 && (
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-border-light pt-4 text-[11px] text-text-secondary">
+              <span>
+                Showing {(activeAssignmentsPage - 1) * activeAssignmentsPerPage + 1}-{Math.min(activeAssignmentsPage * activeAssignmentsPerPage, activeAssignments.length)} of {activeAssignments.length} assignments
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={activeAssignmentsPage === 1}
+                  onClick={() => setActiveAssignmentsPage(page => Math.max(1, page - 1))}
+                  className="rounded-lg border border-border-light bg-white px-3 py-1.5 font-semibold text-text-primary hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span className="font-bold text-indigo-700">Page {activeAssignmentsPage}</span>
+                <button
+                  type="button"
+                  disabled={activeAssignmentsPage >= Math.ceil(activeAssignments.length / activeAssignmentsPerPage)}
+                  onClick={() => setActiveAssignmentsPage(page => page + 1)}
+                  className="rounded-lg border border-border-light bg-white px-3 py-1.5 font-semibold text-text-primary hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
