@@ -25,17 +25,20 @@ export const AdminBookAssignment: React.FC = () => {
   // Derived agent
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
-  // Fetch available books from API when game changes
-  useEffect(() => {
-    if (!selectedGameId) { setAvailableBooks([]); setBookCount(''); return; }
+  const [activeAssignedBooks, setActiveAssignedBooks] = useState<Book[]>([]);
+  const [loadingActiveAssignments, setLoadingActiveAssignments] = useState(false);
+
+  // Fetch available books for selected game
+  const fetchAvailableBooks = (gameId: string) => {
+    if (!gameId) { setAvailableBooks([]); setBookCount(''); return; }
     const token = localStorage.getItem('admin_token') || '';
     setLoadingBooks(true);
     setGameWindowExpired(false);
     Promise.all([
-      fetch(apiUrl(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=1000`), {
+      fetch(apiUrl(`/api/v1/admin/books?game_id=${gameId}&status=available&page=1&limit=1000`), {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       }).then(r => r.json()),
-      fetchGameLockStatus(selectedGameId)
+      fetchGameLockStatus(gameId)
     ])
       .then(([json, lockStatus]) => {
         if (lockStatus.is_locked) {
@@ -74,11 +77,110 @@ export const AdminBookAssignment: React.FC = () => {
         setGameWindowExpired(false);
       })
       .finally(() => setLoadingBooks(false));
-  }, [selectedGameId]);
+  };
 
   useEffect(() => {
-    fetchBooks(200, 1, false);
-  }, []);
+    fetchAvailableBooks(selectedGameId);
+  }, [selectedGameId]);
+
+  // Load active assignments from server API & history
+  const loadActiveAssignments = async () => {
+    const token = localStorage.getItem('admin_token') || '';
+    setLoadingActiveAssignments(true);
+    try {
+      const [resBooks, resHistory] = await Promise.all([
+        fetch(apiUrl('/api/v1/admin/books?status=assigned&limit=1000'), {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(apiUrl('/api/v1/admin/book-assignments/history?limit=1000'), {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+        }).then(r => r.ok ? r.json() : null).catch(() => null)
+      ]);
+
+      const booksMap = new Map<string, Book>();
+
+      if (resHistory?.success && resHistory.data) {
+        const rawHistory: any[] = Array.isArray(resHistory.data.data) ? resHistory.data.data
+          : Array.isArray(resHistory.data) ? resHistory.data : [];
+        rawHistory.forEach((h: any) => {
+          const apiStatus = String(h.status || '').toLowerCase();
+          if (apiStatus === 'assigned' || apiStatus === 'active' || apiStatus === 'in progress' || apiStatus === 'in_progress') {
+            const bookId = h.book?.book_id || h.book_id || `BK${h.id}`;
+            const agentIdStr = String(h.agent?.agent_id || h.agent_id || '');
+            const agentObj = agents.find(a => String(a.id) === agentIdStr);
+            const agentName = h.agent?.agent_name || h.agent_name || agentObj?.name || 'Assigned Agent';
+            const gameName = h.game?.game_name || h.book?.game?.game_name || games.find(g => String(g.id) === String(h.game_id || h.book?.game_id))?.name || 'Unknown Game';
+
+            booksMap.set(bookId, {
+              id: bookId,
+              apiId: Number(h.book_id || h.book?.id || h.id),
+              gameId: String(h.game_id || h.book?.game_id || ''),
+              gameName,
+              bookName: h.book?.book_name || bookId,
+              agentId: agentIdStr,
+              agentName,
+              tickets: [],
+              bookValue: 0,
+              bookNumber: String(h.book?.id || h.id),
+              serialNumber: h.book?.serial_number || h.serial_number || bookId,
+              totalTickets: Number(h.game?.book_size || 10),
+              soldTickets: 0,
+              unsoldTickets: 0,
+              assignedDate: h.assigned_at || h.assigned_date || h.created_at || '',
+              expiryDate: '',
+              status: 'Assigned'
+            });
+          }
+        });
+      }
+
+      if (resBooks?.success && resBooks.data) {
+        const rawBooks: any[] = Array.isArray(resBooks.data.data) ? resBooks.data.data
+          : Array.isArray(resBooks.data) ? resBooks.data : [];
+        rawBooks.forEach((b: any) => {
+          const apiStatus = String(b.status || '').toLowerCase();
+          if (apiStatus === 'assigned' || apiStatus === 'in progress' || apiStatus === 'in_progress') {
+            const bookId = b.book_id || `BK${b.id}`;
+            const agentIdStr = String(b.agent_id || '');
+            const agentObj = agents.find(a => String(a.id) === agentIdStr);
+            const agentName = b.agent?.agent_name || b.agent_name || agentObj?.name || 'Assigned Agent';
+            const gameName = b.game?.game_name || games.find(g => String(g.id) === String(b.game_id))?.name || 'Unknown Game';
+
+            booksMap.set(bookId, {
+              id: bookId,
+              apiId: Number(b.id),
+              gameId: String(b.game_id),
+              gameName,
+              bookName: b.book_name || bookId,
+              agentId: agentIdStr,
+              agentName,
+              tickets: [],
+              bookValue: 0,
+              bookNumber: String(b.id),
+              serialNumber: b.book_id || `SN-${b.id}`,
+              totalTickets: Number(b.game?.book_size || 10),
+              soldTickets: 0,
+              unsoldTickets: 0,
+              assignedDate: b.assigned_at || b.created_at || '',
+              expiryDate: '',
+              status: 'Assigned'
+            });
+          }
+        });
+      }
+
+      setActiveAssignedBooks(Array.from(booksMap.values()));
+    } catch (e) {
+      console.error('Failed to load active assignments:', e);
+    } finally {
+      setLoadingActiveAssignments(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBooks(1000, 1, false);
+    loadActiveAssignments();
+  }, [agents, games]);
 
   const filteredAvailableBooks = useMemo(() => {
     return availableBooks.filter(b =>
@@ -87,31 +189,60 @@ export const AdminBookAssignment: React.FC = () => {
     );
   }, [availableBooks, bookSearchTerm]);
 
-  // Current active assignments (Assigned / In Progress)
-  const activeAssignments = useMemo(() => {
-    return books.filter(b => b.status === 'Assigned' || b.status === 'In Progress');
-  }, [books]);
+  const getAssignedTimestamp = (b: Book) => {
+    if (b.assignedDate) {
+      const t = new Date(b.assignedDate).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (b.createdDate) {
+      const t = new Date(b.createdDate).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    return b.apiId ? b.apiId * 1000 : 0;
+  };
 
-  const groupedActiveAssignments = useMemo(() => {
-    const groups = new Map<string, Book[]>();
-    activeAssignments.forEach(book => {
-      const agentName = book.agentName || 'Unassigned Agent';
-      const group = groups.get(agentName) || [];
-      group.push(book);
-      groups.set(agentName, group);
+  // Current active assignments (Assigned / In Progress) sorted latest assigned FIRST
+  const activeAssignments = useMemo(() => {
+    const map = new Map<string, Book>();
+    activeAssignedBooks.forEach(b => map.set(b.id, b));
+    books.filter(b => b.status === 'Assigned' || b.status === 'In Progress').forEach(b => {
+      if (!map.has(b.id)) map.set(b.id, b);
     });
 
-    return Array.from(groups.entries())
-      .sort(([firstAgent], [secondAgent]) => firstAgent.localeCompare(secondAgent))
-      .map(([agentName, agentBooks]) => ({
-        agentName,
-        books: agentBooks.sort((firstBook, secondBook) =>
-          (firstBook.serialNumber || firstBook.id).localeCompare(
-            secondBook.serialNumber || secondBook.id,
-            undefined,
-            { numeric: true, sensitivity: 'base' }
-          )
-        )
+    return Array.from(map.values()).sort((a, b) => {
+      const timeA = getAssignedTimestamp(a);
+      const timeB = getAssignedTimestamp(b);
+      if (timeB !== timeA) {
+        return timeB - timeA; // Latest timestamp FIRST
+      }
+      return (b.apiId ?? 0) - (a.apiId ?? 0); // Higher numeric ID first
+    });
+  }, [activeAssignedBooks, books]);
+
+  const groupedActiveAssignments = useMemo(() => {
+    const groups = new Map<string, { agentName: string; maxTime: number; books: Book[] }>();
+
+    activeAssignments.forEach(book => {
+      const agentName = book.agentName || 'Unassigned Agent';
+      const bookTime = getAssignedTimestamp(book);
+      const existing = groups.get(agentName);
+
+      if (!existing) {
+        groups.set(agentName, { agentName, maxTime: bookTime, books: [book] });
+      } else {
+        existing.books.push(book);
+        if (bookTime > existing.maxTime) {
+          existing.maxTime = bookTime;
+        }
+      }
+    });
+
+    // Agent groups sorted by maxTime descending (agent with newest assignment at top)
+    return Array.from(groups.values())
+      .sort((g1, g2) => g2.maxTime - g1.maxTime)
+      .map(group => ({
+        agentName: group.agentName,
+        books: group.books.sort((b1, b2) => getAssignedTimestamp(b2) - getAssignedTimestamp(b1))
       }));
   }, [activeAssignments]);
 
@@ -207,17 +338,25 @@ export const AdminBookAssignment: React.FC = () => {
       await assignBooks(selectedGameId, selectedBookIds, selectedAgentId);
       showToast(`Successfully assigned ${selectedBookIds.length} books to ${selectedAgent?.name}.`, 'success');
       setSelectedBookIds([]);
+      setBookCount('');
       setActiveAssignmentsPage(1);
+
+      // Hard refresh page immediately as requested by user
       window.location.reload();
     } catch (err: any) {
       showToast(err.message || 'Assignment failed.', 'error');
     }
   };
 
-  const handleRevoke = (bookId: string) => {
+  const handleRevoke = async (bookId: string) => {
     if (confirm(`Are you sure you want to revoke assignment for Book ${bookId}?`)) {
-      revokeAssignment(bookId);
-      showToast(`Revoked assignment for Book ${bookId}.`, 'success');
+      try {
+        await revokeAssignment(bookId);
+        showToast(`Revoked assignment for Book ${bookId}.`, 'success');
+        window.location.reload();
+      } catch (err: any) {
+        showToast(err.message || 'Failed to revoke assignment.', 'error');
+      }
     }
   };
 

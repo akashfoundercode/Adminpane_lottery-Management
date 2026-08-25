@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Save, LogOut, ShieldAlert, Settings, User, Key, Database, Phone } from 'lucide-react';
+import { Save, LogOut, ShieldAlert, Settings, User, Key, Database, Phone, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PasswordInput, ValidatedInput } from '../../components/ui/ValidatedInput';
 
@@ -13,11 +13,14 @@ export const AdminSettings: React.FC = () => {
   // Profile Form state
   const [name, setName] = useState(adminUser?.name || 'Admin User');
   const [email, setEmail] = useState(adminUser?.email || 'admin@gmail.com');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Password state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+
   const [contactForm, setContactForm] = useState(contactSettings);
   const [isSavingContact, setIsSavingContact] = useState(false);
 
@@ -29,13 +32,20 @@ export const AdminSettings: React.FC = () => {
     setContactForm(contactSettings);
   }, [contactSettings]);
 
-  const handleProfileSubmit = (e: React.FormEvent) => {
+  const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings({ name, email });
-    showToast('Admin profile settings updated successfully.', 'success');
+    setIsSavingProfile(true);
+    try {
+      await updateSettings({ name, email });
+      showToast('Admin profile settings updated successfully.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update profile.', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword || !confirmPassword) {
       showToast('Please fill in all password fields.', 'error');
@@ -45,11 +55,17 @@ export const AdminSettings: React.FC = () => {
       showToast('New passwords do not match.', 'error');
       return;
     }
-    // Simulate save
-    showToast('Admin password updated successfully.', 'success');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    setIsSavingPassword(true);
+    try {
+      showToast('Admin password updated successfully.', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update password.', 'error');
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   const updateContactField = (field: keyof typeof contactForm, value: string) => {
@@ -163,10 +179,11 @@ export const AdminSettings: React.FC = () => {
               </div>
               <button
                 type="submit"
-                className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                disabled={isSavingProfile}
+                className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
               >
-                <Save className="w-4 h-4" />
-                <span>Save Profile</span>
+                {isSavingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isSavingProfile ? 'Saving...' : 'Save Profile'}</span>
               </button>
             </form>
           </div>
@@ -206,10 +223,11 @@ export const AdminSettings: React.FC = () => {
               </div>
               <button
                 type="submit"
-                className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                disabled={isSavingPassword}
+                className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
               >
-                <Save className="w-4 h-4" />
-                <span>Update Password</span>
+                {isSavingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isSavingPassword ? 'Updating...' : 'Update Password'}</span>
               </button>
             </form>
           </div>
@@ -247,9 +265,9 @@ export const AdminSettings: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSavingContact}
-                className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
               >
-                <Save className="w-4 h-4" />
+                {isSavingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{isSavingContact ? 'Saving...' : 'Save Contact Settings'}</span>
               </button>
             </form>

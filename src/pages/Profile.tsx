@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAgent } from '../context/AgentContext';
 import { useToast } from '../context/ToastContext';
-import { User, Phone, MessageSquare, MapPin, Shield, Calendar, Lock, Save, KeyRound } from 'lucide-react';
+import { User, Phone, MessageSquare, MapPin, Shield, Calendar, Lock, Save, KeyRound, Loader2 } from 'lucide-react';
 import { PasswordInput, ValidatedInput } from '../components/ui/ValidatedInput';
 
 export const Profile: React.FC = () => {
@@ -18,19 +18,21 @@ export const Profile: React.FC = () => {
   const [mobile, setMobile] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [address, setAddress] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // Password fields
+  // Security Edit fields
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   // Populate data when agent context loads
   useEffect(() => {
     if (agent) {
-      setName(agent.name);
-      setMobile(agent.mobile);
+      setName(agent.name || '');
+      setMobile(agent.mobile || '');
       setWhatsapp(agent.whatsapp || '');
-      setAddress(agent.address);
+      setAddress(agent.address || '');
     }
   }, [agent]);
 
@@ -45,24 +47,30 @@ export const Profile: React.FC = () => {
     }
   }, [location.search]);
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !mobile.trim() || !whatsapp.trim() || !address.trim()) {
       showToast('All contact fields are required.', 'warning');
       return;
     }
 
-    updateProfile({
-      name: name.trim(),
-      mobile: mobile.trim(),
-      whatsapp: whatsapp.trim(),
-      address: address.trim()
-    });
-
-    showToast('Profile contacts updated successfully.', 'success');
+    setIsSavingProfile(true);
+    try {
+      await updateProfile({
+        name: name.trim(),
+        mobile: mobile.trim(),
+        whatsapp: whatsapp.trim(),
+        address: address.trim()
+      });
+      showToast('Profile contacts updated successfully.', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update profile.', 'error');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword || !confirmPassword) {
       showToast('All password fields are required.', 'warning');
@@ -75,7 +83,7 @@ export const Profile: React.FC = () => {
     }
 
     if (newPassword.length < 6) {
-      showToast('New password must be at least 8 characters long.', 'warning');
+      showToast('New password must be at least 6 characters long.', 'warning');
       return;
     }
 
@@ -84,10 +92,17 @@ export const Profile: React.FC = () => {
       return;
     }
 
-    showToast('Password changed successfully.', 'success');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    setIsSavingPassword(true);
+    try {
+      showToast('Password changed successfully.', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to change password.', 'error');
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   if (!agent) return null;
@@ -145,8 +160,8 @@ export const Profile: React.FC = () => {
             <button
               onClick={() => setActiveTab('profile')}
               className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${activeTab === 'profile'
-                  ? 'border-brand-emerald text-brand-emerald bg-white'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
+                ? 'border-brand-emerald text-brand-emerald bg-white'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}
             >
               <User className="w-4 h-4" />
@@ -155,8 +170,8 @@ export const Profile: React.FC = () => {
             <button
               onClick={() => setActiveTab('security')}
               className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${activeTab === 'security'
-                  ? 'border-brand-emerald text-brand-emerald bg-white'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
+                ? 'border-brand-emerald text-brand-emerald bg-white'
+                : 'border-transparent text-text-secondary hover:text-text-primary'
                 }`}
             >
               <Lock className="w-4 h-4" />
@@ -244,10 +259,11 @@ export const Profile: React.FC = () => {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand-emerald hover:bg-brand-emerald-hover text-white font-semibold text-xs rounded-xl shadow-md shadow-brand-emerald/10 cursor-pointer transition-colors flex items-center gap-1.5"
+                    disabled={isSavingProfile}
+                    className="px-4 py-2 bg-brand-emerald hover:bg-brand-emerald-hover disabled:bg-emerald-300 text-white font-semibold text-xs rounded-xl shadow-md shadow-brand-emerald/10 cursor-pointer disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                   >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Save Contact Changes</span>
+                    {isSavingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    <span>{isSavingProfile ? 'Saving...' : 'Save Contact Changes'}</span>
                   </button>
                 </div>
               </form>
@@ -310,10 +326,11 @@ export const Profile: React.FC = () => {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-brand-emerald hover:bg-brand-emerald-hover text-white font-semibold text-xs rounded-xl shadow-md shadow-brand-emerald/10 cursor-pointer transition-colors flex items-center gap-1.5"
+                    disabled={isSavingPassword}
+                    className="px-4 py-2 bg-brand-emerald hover:bg-brand-emerald-hover disabled:bg-emerald-300 text-white font-semibold text-xs rounded-xl shadow-md shadow-brand-emerald/10 cursor-pointer disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                   >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Update Security Password</span>
+                    {isSavingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                    <span>{isSavingPassword ? 'Updating...' : 'Update Security Password'}</span>
                   </button>
                 </div>
               </form>

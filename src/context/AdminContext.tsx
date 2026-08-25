@@ -1574,9 +1574,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // Reload lists to sync live state
-      await fetchBooks(200, 1, true);
+      await fetchBooks(1000, 1, false);
       await fetchGames();
-      await fetchAssignmentHistory(10, 0, false);
+      await fetchAssignmentHistory(1000, 0, false);
     } catch (err: any) {
       console.error('API Error in assignBooks:', err);
       throw new Error(err.message || 'API connection failed. Please check if server is running.');

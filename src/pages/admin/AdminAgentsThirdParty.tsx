@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Search, Plus, Edit, Trash2, UserCheck, UserX, Eye, AlertCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, UserCheck, UserX, Eye, AlertCircle, Loader2 } from 'lucide-react';
 import { PageLoader } from '../../components/PageLoader';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 import { PasswordInput, ValidatedInput } from '../../components/ui/ValidatedInput';
@@ -24,6 +24,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [deleteAgentId, setDeleteAgentId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -73,6 +74,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
       showToast('Password must be at least 6 characters.', 'error');
       return;
     }
+    setIsSubmitting(true);
     try {
       await createAgent({
         name,
@@ -96,6 +98,8 @@ export const AdminAgentsThirdParty: React.FC = () => {
       setStatus('Active');
     } catch (err: any) {
       showToast(err.message || 'Failed to create agent.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -126,6 +130,7 @@ export const AdminAgentsThirdParty: React.FC = () => {
       return;
     }
     if (selectedAgent) {
+      setIsSubmitting(true);
       try {
         await updateAgent(selectedAgent.id, {
           name,
@@ -141,6 +146,8 @@ export const AdminAgentsThirdParty: React.FC = () => {
         setSelectedAgent(null);
       } catch (err: any) {
         showToast(err.message || 'Failed to update agent.', 'error');
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -369,9 +376,17 @@ export const AdminAgentsThirdParty: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  Add Agent
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Adding...</span>
+                    </>
+                  ) : (
+                    <span>Add Agent</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -452,9 +467,17 @@ export const AdminAgentsThirdParty: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  Save Changes
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
                 </button>
               </div>
             </form>

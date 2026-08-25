@@ -18,13 +18,37 @@ export const AdminSoldUnsold: React.FC = () => {
     const [isUpdating, setIsUpdating] = useState(false);
     const [unlockingBookId, setUnlockingBookId] = useState<string | null>(null);
 
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+    const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+    const handleManualRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await fetchBooks(1000, 1, false);
+            setLastRefreshed(new Date());
+            showToast('Sold / Unsold books refreshed.', 'info');
+        } catch {
+            showToast('Failed to refresh books.', 'error');
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
     useEffect(() => {
-        fetchBooks(200, 1, false);
+        fetchBooks(1000, 1, false);
+        setLastRefreshed(new Date());
+
+        if (!autoRefreshEnabled) return;
+
         const refreshInterval = window.setInterval(() => {
-            fetchBooks(200, currentPageRef.current, false);
-        }, 30000);
+            fetchBooks(1000, currentPageRef.current, false).then(() => {
+                setLastRefreshed(new Date());
+            });
+        }, 5000); // Fast 5-second auto-refresh
+
         return () => window.clearInterval(refreshInterval);
-    }, []);
+    }, [autoRefreshEnabled]);
 
     const getAgentName = (agentId?: string, agentName?: string) => {
         if (agentName) return agentName;
@@ -55,6 +79,8 @@ export const AdminSoldUnsold: React.FC = () => {
             await updateBookStatus(pendingStatus.bookId, pendingStatus.status);
             showToast(`Book marked as ${pendingStatus.status}.`, 'success');
             setPendingStatus(null);
+            await fetchBooks(1000, 1, false);
+            setLastRefreshed(new Date());
         } catch (error) {
             showToast(error instanceof Error ? error.message : 'Failed to update book status.', 'error');
         } finally {
@@ -67,7 +93,8 @@ export const AdminSoldUnsold: React.FC = () => {
         try {
             await unlockBookByAdmin(book.apiId ?? book.id);
             showToast(`Book ${book.id} unlocked for the agent.`, 'success');
-            await fetchBooks(10, booksPagination.currentPage, false);
+            await fetchBooks(1000, booksPagination.currentPage, false);
+            setLastRefreshed(new Date());
         } catch (error) {
             showToast(error instanceof Error ? error.message : 'Failed to unlock book.', 'error');
         } finally {
@@ -78,12 +105,47 @@ export const AdminSoldUnsold: React.FC = () => {
     return (
         <>
             <div className="space-y-6 font-sans">
-                <div>
-                    <h2 className="text-[20px] font-bold text-text-primary font-display">Sold / Unsold Books</h2>
-                    <p className="flex items-center gap-1.5 text-xs text-text-secondary">
-                        Books updated by agents through the Sold or Unsold API
-                        {loadingBooks && <RefreshCw className="h-3 w-3 animate-spin" aria-label="Refreshing books" />}
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 className="text-[20px] font-bold text-text-primary font-display flex items-center gap-2">
+                            Sold / Unsold Books
+                            {(loadingBooks || isRefreshing) && (
+                                <RefreshCw className="h-4 w-4 text-indigo-600 animate-spin" aria-label="Refreshing..." />
+                            )}
+                        </h2>
+                        <p className="flex items-center gap-1.5 text-xs text-text-secondary">
+                            Books updated by agents through the Sold or Unsold API
+                            {lastRefreshed && (
+                                <span className="font-mono text-[11px] text-slate-400">
+                                    • Updated: {lastRefreshed.toLocaleTimeString()}
+                                </span>
+                            )}
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setAutoRefreshEnabled(prev => !prev)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${autoRefreshEnabled
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                                }`}
+                        >
+                            <span className={`w-2 h-2 rounded-full ${autoRefreshEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                            {autoRefreshEnabled ? 'Auto Refresh (5s)' : 'Auto Refresh OFF'}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleManualRefresh}
+                            disabled={loadingBooks || isRefreshing}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${(loadingBooks || isRefreshing) ? 'animate-spin' : ''}`} />
+                            <span>Refresh</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-4 rounded-xl border border-border-light shadow-sm">

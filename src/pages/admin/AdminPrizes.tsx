@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, Trophy, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, Trophy, AlertCircle, Loader2 } from 'lucide-react';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 export const AdminPrizes: React.FC = () => {
@@ -12,6 +12,7 @@ export const AdminPrizes: React.FC = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedPrize, setSelectedPrize] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Delete State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -23,25 +24,32 @@ export const AdminPrizes: React.FC = () => {
   const [amount, setAmount] = useState(100000);
   const [winnersCount, setWinnersCount] = useState(1);
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || amount <= 0 || winnersCount <= 0) {
       showToast('Please enter valid details.', 'error');
       return;
     }
-    createPrize({
-      position,
-      name,
-      amount,
-      winnersCount,
-      status: 'Active'
-    });
-    showToast('Prize created successfully.', 'success');
-    setIsAddOpen(false);
-    // Reset fields
-    setName('');
-    setAmount(100000);
-    setWinnersCount(1);
+    setIsSaving(true);
+    try {
+      await createPrize({
+        position,
+        name,
+        amount,
+        winnersCount,
+        status: 'Active'
+      });
+      showToast('Prize created successfully.', 'success');
+      setIsAddOpen(false);
+      // Reset fields
+      setName('');
+      setAmount(100000);
+      setWinnersCount(1);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to create prize.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEditClick = (prize: any) => {
@@ -53,22 +61,29 @@ export const AdminPrizes: React.FC = () => {
     setIsEditOpen(true);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || amount <= 0 || winnersCount <= 0) {
       showToast('Please enter valid details.', 'error');
       return;
     }
     if (selectedPrize) {
-      updatePrize(selectedPrize.id, {
-        position,
-        name,
-        amount,
-        winnersCount
-      });
-      showToast('Prize updated successfully.', 'success');
-      setIsEditOpen(false);
-      setSelectedPrize(null);
+      setIsSaving(true);
+      try {
+        await updatePrize(selectedPrize.id, {
+          position,
+          name,
+          amount,
+          winnersCount
+        });
+        showToast('Prize updated successfully.', 'success');
+        setIsEditOpen(false);
+        setSelectedPrize(null);
+      } catch (err: any) {
+        showToast(err.message || 'Failed to update prize.', 'error');
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -120,17 +135,15 @@ export const AdminPrizes: React.FC = () => {
           <div key={prize.id} className="premium-card p-5 bg-white border border-border-light shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
             <div>
               <div className="flex justify-between items-start">
-                <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                  prize.position.startsWith('1st') ? 'bg-[#FDF2F2] text-rose-700 border border-rose-100' :
-                  prize.position.startsWith('2nd') ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                  prize.position.startsWith('3rd') ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                  'bg-slate-50 text-slate-700 border border-slate-200'
-                }`}>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${prize.position.startsWith('1st') ? 'bg-[#FDF2F2] text-rose-700 border border-rose-100' :
+                    prize.position.startsWith('2nd') ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                      prize.position.startsWith('3rd') ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                        'bg-slate-50 text-slate-700 border border-slate-200'
+                  }`}>
                   {prize.position}
                 </span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                  prize.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                }`}>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold ${prize.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  }`}>
                   {prize.status}
                 </span>
               </div>
@@ -243,9 +256,17 @@ export const AdminPrizes: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm cursor-pointer"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  Save Prize
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Prize</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -317,9 +338,17 @@ export const AdminPrizes: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm cursor-pointer"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#6366f1] text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  Save Changes
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
                 </button>
               </div>
             </form>
