@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../context/ToastContext';
-import { ArrowLeft, Save, Upload, Trophy, Ticket, Image as ImageIcon, Info, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Upload, Trophy, Ticket, Image as ImageIcon, Info, Trash2, Loader2 } from 'lucide-react';
 import { GamePrize } from '../../types';
 import { ValidatedInput } from '../../components/ui/ValidatedInput';
 
@@ -30,6 +30,7 @@ export const AdminGameCreate: React.FC = () => {
   const [youtubeLiveUrl, setYoutubeLiveUrl] = useState('https://youtube.com/live/demo');
   const [facebookLiveUrl, setFacebookLiveUrl] = useState('https://facebook.com/live/demo');
   const [prizes, setPrizes] = useState<GamePrize[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -148,6 +149,7 @@ export const AdminGameCreate: React.FC = () => {
     }
 
     try {
+      setIsSaving(true);
       if (editId && editGame) {
         await updateGame(editId, {
           name,
@@ -191,6 +193,8 @@ export const AdminGameCreate: React.FC = () => {
       navigate('/admin/games');
     } catch (err: any) {
       showToast(err.message || 'Failed to save game.', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -458,10 +462,11 @@ export const AdminGameCreate: React.FC = () => {
             </Link>
             <button
               type="submit"
-              className="inline-flex items-center gap-2 bg-[#6366f1] hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+              disabled={isSaving}
+              className="inline-flex items-center gap-2 bg-[#6366f1] hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer"
             >
-              <Save className="w-4 h-4" />
-              <span>{editGame ? 'Update Game' : 'Save Game'}</span>
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{isSaving ? (editGame ? 'Updating...' : 'Saving...') : (editGame ? 'Update Game' : 'Save Game')}</span>
             </button>
           </div>
         </form>
