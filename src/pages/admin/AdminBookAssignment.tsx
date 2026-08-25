@@ -7,7 +7,7 @@ import { apiUrl } from '../../config/api';
 import { ValidatedInput } from '../../components/ui/ValidatedInput';
 
 export const AdminBookAssignment: React.FC = () => {
-  const { games, books, agents, assignBooks, revokeAssignment, fetchGameLockStatus } = useAdmin();
+  const { games, books, agents, assignBooks, revokeAssignment, fetchBooks, fetchGameLockStatus } = useAdmin();
   const { showToast } = useToast();
 
   const [selectedGameId, setSelectedGameId] = useState('');
@@ -32,7 +32,7 @@ export const AdminBookAssignment: React.FC = () => {
     setLoadingBooks(true);
     setGameWindowExpired(false);
     Promise.all([
-      fetch(apiUrl(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=200`), {
+      fetch(apiUrl(`/api/v1/admin/books?game_id=${selectedGameId}&status=available&page=1&limit=1000`), {
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       }).then(r => r.json()),
       fetchGameLockStatus(selectedGameId)
@@ -75,6 +75,10 @@ export const AdminBookAssignment: React.FC = () => {
       })
       .finally(() => setLoadingBooks(false));
   }, [selectedGameId]);
+
+  useEffect(() => {
+    fetchBooks(200, 1, false);
+  }, []);
 
   const filteredAvailableBooks = useMemo(() => {
     return availableBooks.filter(b =>
@@ -133,22 +137,39 @@ export const AdminBookAssignment: React.FC = () => {
 
   // Toggle book selection
   const handleToggleBook = (bookId: string) => {
-    setSelectedBookIds(prev =>
-      prev.includes(bookId) ? prev.filter(id => id !== bookId) : [...prev, bookId]
-    );
+    setSelectedBookIds(prev => {
+      if (prev.includes(bookId)) {
+        return prev.filter(id => id !== bookId);
+      } else {
+        if (prev.length >= 100) {
+          showToast('Maximum 100 books can be selected at a time.', 'error');
+          return prev;
+        }
+        return [...prev, bookId];
+      }
+    });
   };
 
   const handleSelectAllBooks = () => {
-    if (selectedBookIds.length === availableBooks.length) {
+    if (selectedBookIds.length > 0) {
       setSelectedBookIds([]);
     } else {
-      setSelectedBookIds(availableBooks.map(b => String(b.apiId ?? b.id)));
+      if (availableBooks.length > 100) {
+        setSelectedBookIds(availableBooks.slice(0, 100).map(b => String(b.apiId ?? b.id)));
+        showToast('Selected maximum limit of 100 books.', 'info');
+      } else {
+        setSelectedBookIds(availableBooks.map(b => String(b.apiId ?? b.id)));
+      }
     }
   };
 
   const handleSelectBookCount = () => {
     if (bookCount === '' || bookCount < 1) {
       showToast('Please enter a book count greater than 0.', 'error');
+      return;
+    }
+    if (bookCount > 100) {
+      showToast('Maximum 100 books can be selected at a time.', 'error');
       return;
     }
     if (bookCount > availableBooks.length) {
@@ -172,6 +193,10 @@ export const AdminBookAssignment: React.FC = () => {
       showToast('Please select at least one book to assign.', 'error');
       return;
     }
+    if (selectedBookIds.length > 100) {
+      showToast('Maximum 100 books can be selected at a time.', 'error');
+      return;
+    }
     if (!selectedAgentId) {
       showToast('Please select an agent.', 'error');
       return;
@@ -183,6 +208,7 @@ export const AdminBookAssignment: React.FC = () => {
       showToast(`Successfully assigned ${selectedBookIds.length} books to ${selectedAgent?.name}.`, 'success');
       setSelectedBookIds([]);
       setActiveAssignmentsPage(1);
+      window.location.reload();
     } catch (err: any) {
       showToast(err.message || 'Assignment failed.', 'error');
     }
@@ -271,7 +297,7 @@ export const AdminBookAssignment: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center mb-1.5">
                   <label className="block text-xs font-semibold text-text-primary uppercase tracking-wider">
-                    Select Books ({selectedBookIds.length} selected)
+                    Select Books ({selectedBookIds.length}/100 max)
                   </label>
                   {availableBooks.length > 0 && (
                     <button
@@ -279,7 +305,7 @@ export const AdminBookAssignment: React.FC = () => {
                       onClick={handleSelectAllBooks}
                       className="text-[10px] text-indigo-600 font-bold hover:underline"
                     >
-                      {selectedBookIds.length === availableBooks.length ? 'Deselect All' : 'Select All'}
+                      {selectedBookIds.length > 0 ? 'Deselect All' : (availableBooks.length > 100 ? 'Select First 100' : 'Select All')}
                     </button>
                   )}
                 </div>
@@ -301,11 +327,11 @@ export const AdminBookAssignment: React.FC = () => {
                 {availableBooks.length > 0 && (
                   <div className="flex items-end gap-2 mb-3">
                     <label className="flex-1 text-[10px] font-bold text-text-secondary uppercase tracking-wider">
-                      Book Count
+                      Book Count (Max 100)
                       <ValidatedInput
                         type="number"
                         min="1"
-                        max={availableBooks.length}
+                        max={Math.min(100, availableBooks.length)}
                         value={bookCount}
                         onChange={(e) => setBookCount(e.target.value === '' ? '' : Number(e.target.value))}
                         placeholder="e.g. 10"

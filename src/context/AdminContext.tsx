@@ -1531,6 +1531,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const assignBooks = async (_gameId: string, bookIds: string[], agentId: string, _expiryDate?: string) => {
     const token = localStorage.getItem('admin_token');
     if (!token) throw new Error('Admin session is missing. Please log in again.');
+    if (bookIds.length > 100) {
+      throw new Error('Maximum 100 books can be assigned at a time.');
+    }
 
     // Find numeric database IDs for books
     const numericBookIds = bookIds.map(bId => {
